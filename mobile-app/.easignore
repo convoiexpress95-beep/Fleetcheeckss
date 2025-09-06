@@ -1,0 +1,13 @@
+# Exclude typical dev artifacts. Keep native android/ for EAS build.
+node_modules
+.expo
+.git
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+dist
+build
+.cache
+.expo-shared
+.DS_Store
+Thumbs.db
