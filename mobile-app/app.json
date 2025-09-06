@@ -60,13 +60,6 @@
         }
       ],
       [
-        "expo-notifications",
-        {
-          "color": "#2563eb",
-          "defaultChannel": "default"
-        }
-      ],
-      [
         "expo-image-picker",
         {
           "photosPermission": "Cette app accède à vos photos pour les rapports d'inspection.",
