@@ -31,8 +31,11 @@ Thumbs.db
 *.apk
 *.aab
 *.keystore
+# Ignore global Android/iOS at repo root but keep mobile-app native projects
 android/
 ios/
+!mobile-app/android/**
+!mobile-app/ios/**
 
 # Supabase local artifacts
 supabase/.temp/
