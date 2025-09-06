@@ -1,0 +1,16 @@
+* text=auto
+
+# Force LF on shell scripts used by EAS Linux runners
+gradlew text eol=lf
+*.sh text eol=lf
+*.gradle text eol=lf
+*.kt text eol=lf
+
+# Windows batch files keep CRLF
+*.bat text eol=crlf
+gradlew.bat text eol=crlf
+
+# JSON/TS/TSX normalized
+*.json text eol=lf
+*.ts text eol=lf
+*.tsx text eol=lf
