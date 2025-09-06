@@ -31,9 +31,10 @@ Thumbs.db
 *.apk
 *.aab
 *.keystore
-# Ignore global Android/iOS at repo root but keep mobile-app native projects
-android/
-ios/
+# Ignorer seulement les dossiers Android/iOS à la racine du repo
+/android/
+/ios/
+# Conserver les projets natifs sous mobile-app
 !mobile-app/android/**
 !mobile-app/ios/**
 
