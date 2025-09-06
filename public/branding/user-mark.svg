@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024" role="img" aria-labelledby="title desc">
+  <title id="title">Fleetchecks - Mark (themed)</title>
+  <desc id="desc">Icône carrée avec fond dégradé de marque et logo fourni (PNG) centré.</desc>
+  <defs>
+    <linearGradient id="brand" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0ea5e9"/>
+      <stop offset="100%" stop-color="#2563eb"/>
+    </linearGradient>
+  </defs>
+  <rect x="32" y="32" width="960" height="960" rx="220" fill="url(#brand)"/>
+  <clipPath id="clip">
+    <rect x="32" y="32" width="960" height="960" rx="220"/>
+  </clipPath>
+  <image href="https://i.ibb.co/xqf1LCDC/Chat-GPT-Image-6-sept-2025-01-04-56.png" x="140" y="140" width="744" height="744" preserveAspectRatio="xMidYMid meet" clip-path="url(#clip)"/>
+</svg>

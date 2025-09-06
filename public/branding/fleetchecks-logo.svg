@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="2400" height="800" viewBox="0 0 2400 800" role="img" aria-labelledby="title desc">
+  <title id="title">Voiture moderne</title>
+  <desc id="desc">Icône unique d’une voiture moderne, minimaliste, grand format.</desc>
+
+  <defs>
+    <linearGradient id="bodyGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0ea5e9"/>
+      <stop offset="100%" stop-color="#2563eb"/>
+    </linearGradient>
+    <linearGradient id="glassGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#e6f2ff"/>
+      <stop offset="100%" stop-color="#cfe0ff"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Ombre douce -->
+  <ellipse cx="1200" cy="610" rx="540" ry="48" fill="#0b1220" opacity="0.12"/>
+
+  <!-- Carrosserie -->
+  <path d="M 460 540
+           Q 440 540 440 520
+           L 440 490
+           Q 440 470 452 450
+           Q 500 380 640 350
+           Q 860 300 1080 300
+           L 1320 300
+           Q 1560 300 1740 340
+           Q 1860 365 1930 430
+           Q 1960 460 1960 500
+           L 1960 520
+           Q 1960 540 1940 540
+           L 1610 540
+           A 70 70 0 0 1 1480 540
+           L 920 540
+           A 70 70 0 0 1 790 540
+           Z"
+        fill="url(#bodyGrad)"/>
+
+  <!-- Vitres -->
+  <path d="M 860 310
+           Q 1040 300 1160 300
+           L 1320 300
+           Q 1490 300 1630 330
+           Q 1700 345 1760 370
+           L 1760 420
+           L 880 420
+           Q 860 420 860 400
+           Z" fill="url(#glassGrad)" opacity="0.95"/>
+
+  <!-- Détails minimalistes (lignes) -->
+  <g stroke="#ffffff" stroke-opacity="0.9" stroke-width="10" fill="none" stroke-linecap="round">
+    <path d="M 980 470 L 1400 470" opacity="0.35"/>
+    <path d="M 1540 470 L 1680 470" opacity="0.35"/>
+  </g>
+
+  <!-- Roues -->
+  <g>
+    <circle cx="860" cy="540" r="82" fill="#0f172a"/>
+    <circle cx="1540" cy="540" r="82" fill="#0f172a"/>
+    <circle cx="860" cy="540" r="36" fill="#475569"/>
+    <circle cx="1540" cy="540" r="36" fill="#475569"/>
+  </g>
+
+  <!-- Leds / phares discrets -->
+  <g>
+    <rect x="460" y="500" width="26" height="12" rx="6" fill="#e6ff7a" opacity="0.9"/>
+    <rect x="1914" y="500" width="26" height="12" rx="6" fill="#e6ff7a" opacity="0.9"/>
+  </g>
+</svg>

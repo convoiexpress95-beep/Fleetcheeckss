@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="2400" height="800" viewBox="0 0 2400 800" role="img" aria-labelledby="title desc">
+  <title id="title">Fleetchecks - Lockup (themed)</title>
+  <desc id="desc">Wrapper lockup avec couleurs de marque et logo fourni (PNG) centré.</desc>
+  <defs>
+    <linearGradient id="brand" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0ea5e9"/>
+      <stop offset="100%" stop-color="#2563eb"/>
+    </linearGradient>
+  </defs>
+  <!-- Fond subtil pour mieux intégrer le logo -->
+  <rect x="0" y="0" width="2400" height="800" fill="none"/>
+  <!-- Pastille de marque à gauche -->
+  <g transform="translate(80,120)">
+    <rect x="0" y="0" width="560" height="560" rx="140" fill="url(#brand)"/>
+    <!-- Image PNG centrée dans la pastille -->
+    <clipPath id="clip">
+      <rect x="0" y="0" width="560" height="560" rx="140"/>
+    </clipPath>
+  <image href="https://i.ibb.co/xqf1LCDC/Chat-GPT-Image-6-sept-2025-01-04-56.png" x="40" y="40" width="480" height="480" preserveAspectRatio="xMidYMid meet" clip-path="url(#clip)"/>
+  </g>
+
+  <!-- Wordmark à droite -->
+  <g transform="translate(760, 210)">
+    <text x="0" y="220" font-family="Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif" font-size="220" font-weight="800" letter-spacing="0.5">
+      <tspan fill="#0b1220">Fleet</tspan><tspan fill="#2563eb">checks</tspan>
+    </text>
+  </g>
+</svg>

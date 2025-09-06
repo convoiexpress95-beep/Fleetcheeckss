@@ -1,0 +1,38 @@
+project_id = "lucpsjwaglmiejpfxofe"
+
+[functions.generate-tracking-link]
+verify_jwt = true
+
+[functions.public-tracking]
+verify_jwt = false
+
+[functions.send-invitation]
+verify_jwt = true
+
+[functions.send-push-notification]
+verify_jwt = true
+
+[functions.validate-company-insee]
+verify_jwt = true
+
+[functions.create-mollie-payment]
+verify_jwt = true
+
+[functions.capture-mollie-payment]
+verify_jwt = true
+
+[functions.zip-mission-photos]
+verify_jwt = true
+
+[functions.issue-mission-photo-url]
+verify_jwt = true
+[functions.hello-world]
+enabled = true
+verify_jwt = true
+import_map = "./functions/hello-world/deno.json"
+# Uncomment to specify a custom file path to the entrypoint.
+# Supported file extensions are: .ts, .js, .mjs, .jsx, .tsx
+entrypoint = "./functions/hello-world/index.ts"
+# Specifies static files to be bundled with the function. Supports glob patterns.
+# For example, if you want to serve static HTML pages in your function:
+# static_files = [ "./functions/hello-world/*.html" ]
