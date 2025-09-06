@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="200dp"
+    android:height="200dp"
+    android:viewportWidth="200"
+    android:viewportHeight="200">
+    <!-- Placeholder logo for splash screen -->
+    <path
+        android:fillColor="#2563EB"
+        android:pathData="M0,0h200v200h-200z" />
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M50,90h100v20h-100z" />
+</vector>
