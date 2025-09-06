@@ -2,6 +2,7 @@
   "expo": {
     "name": "FleetCheck Mobile",
     "slug": "fleetcheck-mobile",
+  "scheme": "fleetcheck-mobile",
     "version": "1.0.0",
     "orientation": "portrait",
     
@@ -24,7 +25,7 @@
         "NSPhotoLibraryUsageDescription": "Cette application peut accéder à vos photos pour les rapports d'inspection."
       }
     },
-    "android": {
+  "android": {
       "adaptiveIcon": {
         "backgroundColor": "#2563eb"
       },
@@ -34,6 +35,7 @@
         "android.permission.ACCESS_FINE_LOCATION",
         "android.permission.ACCESS_BACKGROUND_LOCATION",
         "android.permission.CAMERA",
+    "android.permission.POST_NOTIFICATIONS",
         "android.permission.FOREGROUND_SERVICE",
         "android.permission.FOREGROUND_SERVICE_LOCATION",
         "android.permission.RECORD_AUDIO"
