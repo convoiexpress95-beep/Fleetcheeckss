@@ -4,8 +4,10 @@
     "slug": "fleetcheck-mobile",
     "version": "1.0.0",
     "orientation": "portrait",
+    
     "userInterfaceStyle": "light",
     "splash": {
+      
       "resizeMode": "contain",
       "backgroundColor": "#2563eb"
     },
@@ -19,12 +21,7 @@
         "NSLocationAlwaysAndWhenInUseUsageDescription": "Cette application nécessite l'accès à votre localisation pour le suivi des missions en temps réel.",
         "NSLocationWhenInUseUsageDescription": "Cette application utilise votre localisation pour géolocaliser les photos d'inspection.",
         "NSCameraUsageDescription": "Cette application a besoin d'accéder à votre appareil photo pour prendre des photos d'état des lieux.",
-        "NSPhotoLibraryUsageDescription": "Cette application peut accéder à vos photos pour les rapports d'inspection.",
-        "LSApplicationQueriesSchemes": [
-          "waze",
-          "maps",
-          "comgooglemaps"
-        ]
+        "NSPhotoLibraryUsageDescription": "Cette application peut accéder à vos photos pour les rapports d'inspection."
       }
     },
     "android": {
@@ -37,8 +34,6 @@
         "android.permission.ACCESS_FINE_LOCATION",
         "android.permission.ACCESS_BACKGROUND_LOCATION",
         "android.permission.CAMERA",
-        "android.permission.READ_EXTERNAL_STORAGE",
-        "android.permission.WRITE_EXTERNAL_STORAGE",
         "android.permission.FOREGROUND_SERVICE",
         "android.permission.FOREGROUND_SERVICE_LOCATION",
         "android.permission.RECORD_AUDIO"
@@ -76,8 +71,7 @@
           "cameraPermission": "Cette app utilise l'appareil photo pour les états des lieux."
         }
       ],
-      "expo-font",
-      "expo-mail-composer"
+      "expo-font"
     ],
     "extra": {
       "eas": {
