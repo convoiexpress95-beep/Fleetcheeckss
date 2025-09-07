@@ -8,7 +8,9 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "db:migrate": "powershell -ExecutionPolicy Bypass -File ./scripts/apply-supabase-migrations.ps1 -Host db.lucpsjwaglmiejpfxofe.supabase.co -DbName postgres -User postgres -SslMode require -MakeBucketPublic",
+    "db:types": "powershell -NoProfile -ExecutionPolicy Bypass -Command \"npx -y supabase@latest gen types typescript --project-id lucpsjwaglmiejpfxofe --schema public | Set-Content -Encoding UTF8 'src/integrations/supabase/types.ts'\""
   },
   "dependencies": {
     "@capacitor/core": "^6.1.2",
