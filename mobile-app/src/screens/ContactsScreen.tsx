@@ -1,262 +1,214 @@
-import React from 'react';
+import React, { useMemo, useState } from 'react';
+import { View, FlatList, RefreshControl, Linking } from 'react-native';
+import { Appbar, Button, Dialog, List, Portal, Searchbar, Text, TextInput } from 'react-native-paper';
 import {
-  View,
-  Text,
-  StyleSheet,
-  FlatList,
-  TouchableOpacity,
-  RefreshControl,
-  Linking,
-} from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import { useQuery } from '@tanstack/react-query';
-import { supabase } from '../config/supabase';
-import { useAuth } from '../contexts/AuthContext';
-import { Contact } from '../types';
-import { tokens } from '../theme';
+  useMyContacts,
+  useIncomingInvitations,
+  useAcceptInvitation,
+  useDeclineInvitation,
+  useCancelContact,
+  useSendInvitation,
+  useAddContact,
+  useProfileSearch,
+} from '../hooks/useContacts';
 
-export const ContactsScreen: React.FC = () => {
-  const { user } = useAuth();
+const PAGE_SIZE = 20;
 
-  const { data: contacts, isLoading, refetch } = useQuery({
-    queryKey: ['contacts', user?.id],
-    queryFn: async (): Promise<Contact[]> => {
-      if (!user?.id) throw new Error('User not authenticated');
+import type ReactType from 'react';
+const ContactsScreen: ReactType.FC = () => {
+  const [query, setQuery] = useState('');
+  const [page, setPage] = useState(0);
+  const [addOpen, setAddOpen] = useState(false);
+  const [inviteEmail, setInviteEmail] = useState('');
+  const [inviteName, setInviteName] = useState('');
+  const [selectedUserId, setSelectedUserId] = useState<string | undefined>(undefined);
 
-      const { data, error } = await supabase
-        .from('contacts')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false });
+  const { data, isLoading, refetch, isRefetching } = useMyContacts(page, PAGE_SIZE, query);
+  const { data: invites, isLoading: invitesLoading, refetch: refetchInvites } = useIncomingInvitations();
+  const accept = useAcceptInvitation();
+  const decline = useDeclineInvitation();
+  const cancel = useCancelContact();
+  const sendInvitation = useSendInvitation();
+  const addContact = useAddContact();
+  const profileSearch = useProfileSearch(inviteEmail || inviteName);
 
-      if (error) throw error;
-      return data || [];
-    },
-    enabled: !!user?.id,
-  });
+  const list = useMemo(() => data?.data || [], [data]);
 
-  const handleCall = (phone?: string | null) => {
-    if (phone) {
-      Linking.openURL(`tel:${phone}`);
-    }
+  const onRefresh = () => {
+    refetch();
+    refetchInvites();
   };
 
-  const handleEmail = (email: string) => {
-    if (email) {
-      Linking.openURL(`mailto:${email}`);
-    }
-  };
+  return (
+    <View style={{ flex: 1 }}>
+      <Appbar.Header>
+        <Appbar.Content title="Contacts" />
+        <Appbar.Action icon="account-plus" onPress={() => setAddOpen(true)} />
+      </Appbar.Header>
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'active': return '#10b981';
-      case 'pending': return '#f59e0b';
-      case 'declined': return '#ef4444';
-      default: return '#6b7280';
-    }
-  };
+      <Searchbar
+        placeholder="Rechercher (nom ou email)"
+        value={query}
+        onChangeText={(t) => {
+          setQuery(t);
+          setPage(0);
+        }}
+        style={{ margin: 12 }}
+      />
 
-  const getStatusLabel = (status: string) => {
-    switch (status) {
-      case 'active': return 'Actif';
-      case 'pending': return 'En attente';
-      case 'declined': return 'Refusé';
-      default: return status;
-    }
-  };
-
-  const renderContactItem = ({ item: contact }: { item: Contact }) => (
-    <View style={styles.contactCard}>
-      <View style={styles.contactHeader}>
-        <View style={styles.contactInfo}>
-          <Text style={styles.contactName}>
-            {contact.name || contact.email.split('@')[0]}
+      {invites && invites.length > 0 && (
+        <View style={{ marginHorizontal: 12 }}>
+          <Text variant="titleMedium" style={{ marginBottom: 8 }}>
+            Invitations reçues
           </Text>
-          <Text style={styles.contactEmail}>{contact.email}</Text>
-        </View>
-        <View style={[styles.statusBadge, { backgroundColor: getStatusColor(contact.status) }]}>
-          <Text style={styles.statusText}>{getStatusLabel(contact.status)}</Text>
-        </View>
-      </View>
-
-      {contact.status === 'active' && (
-        <View style={styles.contactActions}>
-          <TouchableOpacity
-            style={styles.actionButton}
-            onPress={() => handleEmail(contact.email)}
-          >
-            <Ionicons name="mail-outline" size={20} color={tokens.colors.primary} />
-            <Text style={styles.actionText}>Email</Text>
-          </TouchableOpacity>
-
-          {contact.phone && (
-            <TouchableOpacity
-              style={styles.actionButton}
-              onPress={() => handleCall(contact.phone)}
-            >
-              <Ionicons name="call-outline" size={20} color={tokens.colors.accent} />
-              <Text style={styles.actionText}>Appeler</Text>
-            </TouchableOpacity>
-          )}
+          {invites.map((inv: any) => (
+            <List.Item
+              key={inv.id}
+              title={inv.name || inv.email}
+              description={`Invité par ${inv.inviter_name || 'Un utilisateur'} — ${new Date(inv.invited_at).toLocaleDateString()}`}
+              left={(props) => <List.Icon {...props} icon="email" />}
+              right={() => (
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  <Button
+                    mode="contained"
+                    compact
+                    style={{ marginRight: 8 }}
+                    loading={accept.isPending}
+                    onPress={() => accept.mutate(inv.id)}
+                  >
+                    Accepter
+                  </Button>
+                  <Button
+                    mode="outlined"
+                    compact
+                    loading={decline.isPending}
+                    onPress={() => decline.mutate(inv.id)}
+                  >
+                    Refuser
+                  </Button>
+                </View>
+              )}
+            />
+          ))}
         </View>
       )}
 
-      <View style={styles.contactMeta}>
-  <Ionicons name="time-outline" size={14} color={tokens.colors.onSurface} />
-        <Text style={styles.metaText}>
-          {(() => {
-            const dt = new Date(contact.created_at);
-            if (isNaN(dt.getTime())) return 'Date inconnue';
-            const dd = String(dt.getUTCDate()).padStart(2, '0');
-            const mo = String(dt.getUTCMonth() + 1).padStart(2, '0');
-            const yyyy = dt.getUTCFullYear();
-            return `Ajouté le ${dd}/${mo}/${yyyy}`;
-          })()}
-        </Text>
-      </View>
-    </View>
-  );
-
-  return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Contacts</Text>
-        <Text style={styles.subtitle}>
-          Vos contacts professionnels
-        </Text>
-      </View>
-
-      <FlatList
-        data={contacts}
-        renderItem={renderContactItem}
-        keyExtractor={(item) => item.id}
-        contentContainerStyle={styles.listContainer}
-        refreshControl={
-          <RefreshControl refreshing={isLoading} onRefresh={refetch} />
-        }
-        ListEmptyComponent={
-          <View style={styles.emptyContainer}>
-            <Ionicons name="people-outline" size={64} color="#d1d5db" />
-            <Text style={styles.emptyTitle}>Aucun contact</Text>
-            <Text style={styles.emptyText}>
-              Vos contacts seront ajoutés depuis l'interface web
-            </Text>
+  <FlatList
+        data={list}
+        keyExtractor={(item: any) => item.id}
+        renderItem={({ item }: any) => (
+          <List.Item
+            title={item.name || item.email}
+    description={`${item.email}`}
+            left={(props) => <List.Icon {...props} icon="account" />}
+            right={() => (
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                {item.phone ? (
+                  <Button
+                    compact
+                    mode="text"
+                    onPress={() => Linking.openURL(`tel:${item.phone}`)}
+                  >
+                    Appeler
+                  </Button>
+                ) : null}
+                {item.email ? (
+                  <Button
+                    compact
+                    mode="text"
+                    onPress={() => Linking.openURL(`mailto:${item.email}`)}
+                  >
+                    Email
+                  </Button>
+                ) : null}
+                <Button
+                  compact
+                  mode="text"
+                  onPress={() => sendInvitation.mutate({ contactId: item.id })}
+                  loading={sendInvitation.isPending}
+                >
+                  Renvoyer
+                </Button>
+                <Button
+                  compact
+                  mode="text"
+                  onPress={() => cancel.mutate(item.id)}
+                  loading={cancel.isPending}
+                >
+                  Supprimer
+                </Button>
+              </View>
+            )}
+          />
+        )}
+        refreshControl={<RefreshControl refreshing={isRefetching || invitesLoading} onRefresh={onRefresh} />}
+        onEndReached={() => {
+          if ((data?.data?.length || 0) < ((data?.count || 0))) setPage((p) => p + 1);
+        }}
+        contentContainerStyle={{ paddingVertical: 8 }}
+        ListFooterComponent={() => (
+          <View style={{ padding: 12, alignItems: 'center' }}>
+            {isLoading ? <Text>Chargement…</Text> : null}
           </View>
-        }
+        )}
       />
+
+      <Portal>
+        <Dialog visible={addOpen} onDismiss={() => setAddOpen(false)}>
+          <Dialog.Title>Nouveau contact</Dialog.Title>
+          <Dialog.Content>
+            <TextInput
+              label="Email"
+              value={inviteEmail}
+              keyboardType="email-address"
+              autoCapitalize="none"
+              onChangeText={setInviteEmail}
+              style={{ marginBottom: 12 }}
+            />
+            <TextInput label="Nom (optionnel)" value={inviteName} onChangeText={setInviteName} />
+            {profileSearch.data && profileSearch.data.length > 0 && (
+              <View style={{ marginTop: 12 }}>
+                <Text variant="labelSmall" style={{ marginBottom: 4 }}>Suggestions</Text>
+                {profileSearch.data.map((p: any) => (
+                  <List.Item
+                    key={p.user_id}
+                    title={p.full_name || p.email}
+                    description={p.email}
+                    left={(props) => <List.Icon {...props} icon="account-search" />}
+                    onPress={() => {
+                      setSelectedUserId(p.user_id);
+                      setInviteEmail(p.email || '');
+                      if (p.full_name) setInviteName(p.full_name);
+                    }}
+                  />)
+                )}
+              </View>
+            )}
+          </Dialog.Content>
+          <Dialog.Actions>
+            <Button onPress={() => setAddOpen(false)}>Annuler</Button>
+            <Button
+              mode="contained"
+              loading={addContact.isPending || sendInvitation.isPending}
+              onPress={async () => {
+                try {
+                  const c = await addContact.mutateAsync({ email: inviteEmail.trim(), name: inviteName.trim() || undefined, invitedUserId: selectedUserId });
+                  await sendInvitation.mutateAsync({ contactId: c.id });
+                  setInviteEmail('');
+                  setInviteName('');
+                  setSelectedUserId(undefined);
+                  setAddOpen(false);
+                } catch (e) {}
+              }}
+            >
+              Ajouter & Inviter
+            </Button>
+          </Dialog.Actions>
+        </Dialog>
+      </Portal>
     </View>
   );
 };
-
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: tokens.colors.background },
-  header: {
-    padding: 20,
-    backgroundColor: tokens.colors.card,
-    borderBottomWidth: 1,
-    borderBottomColor: tokens.colors.border,
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: tokens.colors.onSurface,
-    marginBottom: 4,
-  },
-  subtitle: {
-    fontSize: 14,
-    color: tokens.colors.onSurface,
-  },
-  listContainer: {
-    padding: 16,
-  },
-  contactCard: {
-    backgroundColor: tokens.colors.surface,
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: tokens.colors.border,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 1,
-  },
-  contactHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 12,
-  },
-  contactInfo: {
-    flex: 1,
-    marginRight: 12,
-  },
-  contactName: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: tokens.colors.onSurface,
-    marginBottom: 4,
-  },
-  contactEmail: {
-    fontSize: 14,
-    color: tokens.colors.onSurface,
-  },
-  statusBadge: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
-  },
-  statusText: {
-    color: 'white',
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  contactActions: {
-    flexDirection: 'row',
-    gap: 12,
-    marginBottom: 12,
-  },
-  actionButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: tokens.colors.card,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    gap: 6,
-  },
-  actionText: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: tokens.colors.onSurface,
-  },
-  contactMeta: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  metaText: {
-    fontSize: 12,
-    color: tokens.colors.onSurface,
-  },
-  emptyContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingTop: 100,
-  },
-  emptyTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: tokens.colors.onSurface,
-    marginTop: 16,
-    marginBottom: 8,
-  },
-  emptyText: {
-    fontSize: 14,
-    color: tokens.colors.onSurface,
-    textAlign: 'center',
-    lineHeight: 20,
-  },
-});
+export default ContactsScreen;
+export { ContactsScreen };
+ 

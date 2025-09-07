@@ -1,15 +1,6 @@
 import 'react-native-gesture-handler';
 import React from 'react';
 import { StatusBar } from 'expo-status-bar';
-import { View } from 'react-native';
-import {
-  useFonts,
-  Inter_300Light,
-  Inter_400Regular,
-  Inter_500Medium,
-  Inter_600SemiBold,
-  Inter_700Bold,
-} from '@expo-google-fonts/inter';
 import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -21,7 +12,6 @@ import { AuthProvider } from './src/contexts/AuthContext';
 import { DashboardScreen } from './src/screens/DashboardScreen';
 import { MissionsScreen } from './src/screens/MissionsScreen';
 import { InspectionScreen } from './src/screens/InspectionScreen';
-import ReportsScreen from './src/screens/ReportsScreen';
 import { ContactsScreen } from './src/screens/ContactsScreen';
 import NewMissionWizard from './src/screens/NewMissionWizard';
 import { SettingsScreen } from './src/screens/SettingsScreen';
@@ -30,7 +20,15 @@ import { useAuth } from './src/contexts/AuthContext';
 import ShopScreen from './src/screens/ShopScreen';
 import { CreditsPill } from './src/components/CreditsPill';
 import { useNavigation } from '@react-navigation/native';
-import theme from './src/theme';
+import MarketplaceScreen from './src/screens/MarketplaceScreen';
+import MessagesScreen from './src/screens/MessagesScreen';
+import ProfileScreen from './src/screens/ProfileScreen';
+import PublicTrackingScreen from './src/screens/PublicTrackingScreen';
+import TrackingScreen from './src/screens/TrackingScreen';
+import TrajetsPartagesScreen from './src/screens/TrajetsPartagesScreen';
+import BillingScreen from './src/screens/BillingScreen';
+import ReportsScreen from './src/screens/ReportsScreen';
+import EditMissionScreen from './src/screens/EditMissionScreen';
 
 const Tab = createBottomTabNavigator();
 const queryClient = new QueryClient();
@@ -49,6 +47,8 @@ function MainTabs() {
             iconName = focused ? 'list' : 'list-outline';
           } else if (route.name === 'Inspection') {
             iconName = focused ? 'camera' : 'camera-outline';
+          } else if (route.name === 'Outils') {
+            iconName = focused ? 'apps' : 'apps-outline';
           } else if (route.name === 'Contacts') {
             iconName = focused ? 'people' : 'people-outline';
           } else if (route.name === 'Settings') {
@@ -59,23 +59,21 @@ function MainTabs() {
 
           return <Ionicons name={iconName} size={size} color={color} />;
         },
-        tabBarStyle: { backgroundColor: theme.tokens.colors.card, borderTopColor: theme.tokens.colors?.border ?? '#111827' },
-        tabBarActiveTintColor: theme.tokens.colors.primary,
-        tabBarInactiveTintColor: '#7a8aa0',
+        tabBarActiveTintColor: '#2563eb',
+        tabBarInactiveTintColor: 'gray',
         headerStyle: {
-          backgroundColor: theme.tokens.colors.card,
+          backgroundColor: '#2563eb',
         },
-        headerTintColor: theme.tokens.colors.onSurface,
+        headerTintColor: '#fff',
         headerTitleStyle: {
           fontWeight: 'bold',
-          fontFamily: 'Inter_600SemiBold',
         },
         headerRight: () => (
           <CreditsPill onPress={() => nav.navigate('Shop' as never)} />
         ),
       })}
     >
-      <Tab.Screen 
+  <Tab.Screen 
         name="Dashboard" 
         component={DashboardScreen} 
         options={{ title: 'Tableau de bord' }}
@@ -93,17 +91,17 @@ function MainTabs() {
       <Tab.Screen 
         name="Reports" 
         component={ReportsScreen}
-        options={{ 
-          title: 'Rapports',
-          tabBarIcon: ({ color, size, focused }) => (
-            <Ionicons name={focused ? 'document' : 'document-outline'} size={size} color={color} />
-          )
-        }}
+        options={{ title: 'Rapports', tabBarButton: () => null }}
+      />
+      <Tab.Screen
+        name="Outils"
+        component={MarketplaceScreen}
+        options={{ title: 'Outils' }}
       />
       <Tab.Screen 
         name="Contacts" 
         component={ContactsScreen}
-        options={{ title: 'Contacts' }}
+        options={{ title: 'Contacts', tabBarButton: () => null }}
       />
       <Tab.Screen 
         name="Settings" 
@@ -113,11 +111,7 @@ function MainTabs() {
       <Tab.Screen
         name="Shop"
         component={ShopScreen}
-        options={{ title: 'Boutique',
-          tabBarIcon: ({ color, size, focused }) => (
-            <Ionicons name={focused ? 'cart' : 'cart-outline'} size={size} color={color} />
-          )
-        }}
+        options={{ title: 'Boutique', tabBarButton: () => null }}
       />
       <Tab.Screen
         name="NewMissionWizard"
@@ -127,6 +121,14 @@ function MainTabs() {
           tabBarButton: () => null, // onglet masqué
         }}
       />
+      {/* Ecrans supplémentaires accessibles via navigation ou raccourcis */}
+      <Tab.Screen name="Messages" component={MessagesScreen} options={{ title: 'Messages', tabBarButton: () => null }} />
+      <Tab.Screen name="Profil" component={ProfileScreen} options={{ title: 'Profil', tabBarButton: () => null }} />
+      <Tab.Screen name="Tracking" component={TrackingScreen} options={{ title: 'Suivi', tabBarButton: () => null }} />
+      <Tab.Screen name="SuiviPublic" component={PublicTrackingScreen} options={{ title: 'Suivi public', tabBarButton: () => null }} />
+      <Tab.Screen name="TrajetsPartages" component={TrajetsPartagesScreen} options={{ title: 'Trajets partagés', tabBarButton: () => null }} />
+      <Tab.Screen name="Billing" component={BillingScreen} options={{ title: 'Facturation', tabBarButton: () => null }} />
+  <Tab.Screen name="EditMission" component={EditMissionScreen} options={{ title: 'Modifier mission', tabBarButton: () => null }} />
     </Tab.Navigator>
   );
 }
@@ -146,42 +148,13 @@ function AppContent() {
 }
 
 export default function App() {
-  const [fontsLoaded] = useFonts({
-    Inter_300Light,
-    Inter_400Regular,
-    Inter_500Medium,
-    Inter_600SemiBold,
-    Inter_700Bold,
-  });
-
-  const paperThemeWithFonts = {
-    ...theme.paperTheme,
-    fonts: {
-      ...theme.paperTheme.fonts,
-      bodyLarge: { ...theme.paperTheme.fonts.bodyLarge, fontFamily: 'Inter_400Regular' },
-      bodyMedium: { ...theme.paperTheme.fonts.bodyMedium, fontFamily: 'Inter_400Regular' },
-      bodySmall: { ...theme.paperTheme.fonts.bodySmall, fontFamily: 'Inter_400Regular' },
-      titleLarge: { ...theme.paperTheme.fonts.titleLarge, fontFamily: 'Inter_600SemiBold' },
-      titleMedium: { ...theme.paperTheme.fonts.titleMedium, fontFamily: 'Inter_600SemiBold' },
-      titleSmall: { ...theme.paperTheme.fonts.titleSmall, fontFamily: 'Inter_600SemiBold' },
-      labelLarge: { ...theme.paperTheme.fonts.labelLarge, fontFamily: 'Inter_500Medium' },
-      labelMedium: { ...theme.paperTheme.fonts.labelMedium, fontFamily: 'Inter_500Medium' },
-      labelSmall: { ...theme.paperTheme.fonts.labelSmall, fontFamily: 'Inter_500Medium' },
-      headlineLarge: { ...theme.paperTheme.fonts.headlineLarge, fontFamily: 'Inter_700Bold' },
-      headlineMedium: { ...theme.paperTheme.fonts.headlineMedium, fontFamily: 'Inter_700Bold' },
-      headlineSmall: { ...theme.paperTheme.fonts.headlineSmall, fontFamily: 'Inter_700Bold' },
-    },
-  } as const;
-
   return (
     <QueryClientProvider client={queryClient}>
-      <PaperProvider theme={paperThemeWithFonts}>
+      <PaperProvider>
         <AuthProvider>
-          <NavigationContainer theme={theme.navTheme}>
+          <NavigationContainer>
             <StatusBar style="light" />
-            <View style={{ flex: 1, backgroundColor: theme.tokens.colors.background }}>
-              {fontsLoaded ? <AppContent /> : null}
-            </View>
+            <AppContent />
             <Toast />
           </NavigationContainer>
         </AuthProvider>

@@ -8,6 +8,8 @@ interface AuthContextType {
   session: Session | null;
   loading: boolean;
   signIn: (email: string, password: string) => Promise<{ error?: any }>;
+  signUp: (email: string, password: string, fullName?: string) => Promise<{ error?: any }>;
+  resetPassword: (email: string) => Promise<{ error?: any }>;
   signOut: () => Promise<void>;
 }
 
@@ -96,6 +98,35 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return { error };
   };
 
+  const signUp = async (email: string, password: string, fullName?: string) => {
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: { full_name: fullName },
+      },
+    });
+
+    if (error) {
+      Toast.show({ type: 'error', text1: 'Inscription échouée', text2: error.message });
+    } else {
+      Toast.show({ type: 'success', text1: 'Vérifiez votre email', text2: "Un lien d'activation vous a été envoyé." });
+    }
+
+    return { error };
+  };
+
+  const resetPassword = async (email: string) => {
+    const redirectTo = (process.env.EXPO_PUBLIC_WEB_BASE_URL || 'https://app.fleetcheck.fr') + '/login';
+    const { data, error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo });
+    if (error) {
+      Toast.show({ type: 'error', text1: 'Réinitialisation impossible', text2: error.message });
+    } else {
+      Toast.show({ type: 'success', text1: 'Email envoyé', text2: 'Vérifiez votre boîte mail pour réinitialiser votre mot de passe.' });
+    }
+    return { error };
+  };
+
   const signOut = async () => {
     const { error } = await supabase.auth.signOut();
     
@@ -115,7 +146,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   return (
-    <AuthContext.Provider value={{ user, session, loading, signIn, signOut }}>
+  <AuthContext.Provider value={{ user, session, loading, signIn, signUp, resetPassword, signOut }}>
       {children}
     </AuthContext.Provider>
   );

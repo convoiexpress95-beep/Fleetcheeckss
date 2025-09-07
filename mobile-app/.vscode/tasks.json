@@ -1,0 +1,22 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "Start Expo Dev (tunnel)",
+			"type": "shell",
+			"command": "npx expo start --tunnel",
+			"isBackground": true,
+			"problemMatcher": [
+				"$eslint-stylish"
+			],
+			"group": "build"
+		},
+		{
+			"label": "expo:start:tunnel",
+			"type": "shell",
+			"command": "npx expo start --tunnel",
+			"isBackground": true,
+			"group": "build"
+		}
+	]
+}

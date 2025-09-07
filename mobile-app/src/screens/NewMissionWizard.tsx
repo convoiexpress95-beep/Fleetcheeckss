@@ -26,7 +26,8 @@ export const NewMissionWizard: React.FC = () => {
   const [step, setStep] = useState<Step>(0);
   const [submitting, setSubmitting] = useState(false);
   const { balance, loading: creditsLoading } = useCredits();
-  const [contacts, setContacts] = useState<Array<{ id: string; invited_user_id?: string | null; name?: string | null; email: string; status: string }>>([]);
+  type ContactLite = { id: string; invited_user_id: string | null; name: string | null; email: string; status: string };
+  const [contacts, setContacts] = useState<ContactLite[]>([]);
   const [selectedContactUserId, setSelectedContactUserId] = useState<string | null>(null);
 
   // Etat du formulaire
@@ -94,13 +95,13 @@ export const NewMissionWizard: React.FC = () => {
   useEffect(() => {
     const loadContacts = async () => {
       if (!user?.id) return;
-      const { data, error } = await supabase
+  const { data, error } = await supabase
         .from('contacts')
         .select('id, invited_user_id, name, email, status')
         .eq('user_id', user.id)
         .eq('status', 'accepted')
         .order('created_at', { ascending: false });
-      if (!error) setContacts(data || []);
+  if (!error) setContacts(((data as any[]) || []) as ContactLite[]);
     };
     loadContacts();
   }, [user?.id]);
@@ -145,7 +146,7 @@ export const NewMissionWizard: React.FC = () => {
       if (creditErr || !creditOk) throw new Error('Crédits insuffisants');
 
   const driverId = assignedTo === 'self' ? user.id : (assignedTo === 'contact' ? (selectedContactUserId || null) : null);
-      const payload: any = {
+  const payload: any = {
         title: title.trim(),
         description: description || null,
         vehicle_type: vehicleType,
@@ -168,7 +169,8 @@ export const NewMissionWizard: React.FC = () => {
         reference: generateReference(),
         created_by: user.id,
         driver_id: driverId,
-        status: 'pending',
+  status: 'pending',
+  kind: 'inspection',
       };
 
       const { error } = await supabase.from('missions').insert(payload);

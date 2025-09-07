@@ -37,3 +37,17 @@ expoAutolinking.useExpoVersionCatalog()
 
 include ':app'
 includeBuild(expoAutolinking.reactNativeGradlePlugin)
+
+gradle.settingsEvaluated { settings ->
+  def downloadsToken = System.getenv('MAPBOX_DOWNLOADS_TOKEN') ?: ''
+  if (downloadsToken) {
+    settings.pluginManagement.repositories.each { repo ->
+      if (repo.hasProperty('url') && repo.url.toString().contains('api.mapbox.com')) {
+        repo.credentials {
+          username = 'mapbox'
+          password = downloadsToken
+        }
+      }
+    }
+  }
+}

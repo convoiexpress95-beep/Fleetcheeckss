@@ -1,42 +1,34 @@
 import React, { useState } from 'react';
-import {
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  StyleSheet,
-  Image,
-  KeyboardAvoidingView,
-  Platform,
-  Dimensions,
-} from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, KeyboardAvoidingView, Platform, Linking, Image } from 'react-native';
 import { useAuth } from '../contexts/AuthContext';
-import { tokens } from '../theme';
+import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import MaskedView from '@react-native-masked-view/masked-view';
-import { BRAND_LOGO_URL } from '../branding';
+import { BlurView } from 'expo-blur';
 
 export const LoginScreen: React.FC = () => {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const { signIn, signUp, resetPassword } = useAuth();
+  const [tab, setTab] = useState<'login' | 'signup'>('login');
   const [loading, setLoading] = useState(false);
-  const { signIn } = useAuth();
+  const [login, setLogin] = useState({ email: '', password: '' });
+  const [signup, setSignup] = useState({ fullName: '', email: '', password: '' });
 
-  // SVG inline pour éviter toute dépendance externe et garantir un rendu net
-  // Utilise l'image PNG distante (nouveau logo)
-  const LOGO_IMG = BRAND_LOGO_URL;
-  const { width: SCREEN_WIDTH } = Dimensions.get('window');
-  const MAX_W = 360;
-  const MIN_W = 260;
-  const H_MARGIN = 48;
-  const LOGO_W = Math.max(MIN_W, Math.min(MAX_W, SCREEN_WIDTH - H_MARGIN));
-  const LOGO_RATIO = 2.35; // ~380/162
+  // Compute logo URL: prefer explicit env logo URL, then site public asset, then icon fallback
+  const baseUrl = process.env.EXPO_PUBLIC_WEB_BASE_URL || 'https://app.fleetcheck.fr';
+  const providedLogo = (process.env.EXPO_PUBLIC_LOGO_URL as string) || 'https://i.ibb.co/RTP2P9FC/Chat-GPT-Image-7-sept-2025-03-32-39.png';
+  const fallbackLogo = `${baseUrl}/icon-128x128.png`;
+  const [logoUri, setLogoUri] = useState<string>(providedLogo);
 
   const handleLogin = async () => {
-    if (!email || !password) return;
-
+    if (!login.email || !login.password) return;
     setLoading(true);
-    await signIn(email, password);
+    await signIn(login.email, login.password);
+    setLoading(false);
+  };
+
+  const handleSignup = async () => {
+    if (!signup.email || !signup.password || !signup.fullName) return;
+    setLoading(true);
+    await signUp(signup.email, signup.password, signup.fullName);
     setLoading(false);
   };
 
@@ -45,101 +37,175 @@ export const LoginScreen: React.FC = () => {
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
+      {/* Background gradients to match web theme */}
       <LinearGradient
-        colors={["#065f46", "#34d399"]}
+        colors={["#0b1020", "#111827"]}
+        style={StyleSheet.absoluteFillObject as any}
+      />
+      <LinearGradient
+        // cosmic-like glow blob (top-left)
+        colors={["#7c3aed66", "#2563eb33", "transparent"]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
-        style={styles.gradient}
-      >
-    <View style={styles.content}>
-        <View style={styles.header}>
-          {/* Logo avec bords arrondis premium + glow bleu */}
-      <View style={[styles.logoWrap, { width: LOGO_W, borderRadius: 24 }]}> 
-            <Image
-              source={{ uri: LOGO_IMG }}
-              style={[
-                styles.logoImage,
-                { width: LOGO_W, aspectRatio: LOGO_RATIO, borderRadius: 20, transform: [{ scaleX: 1.06 }] },
-              ]}
-              accessible
-              accessibilityLabel="FleetChecks"
+        style={{ position: 'absolute', top: -120, left: -80, width: 320, height: 320, borderRadius: 320 }}
+      />
+      <LinearGradient
+        // sunset-like glow blob (bottom-right)
+        colors={["#f9731666", "#ef444433", "transparent"]}
+        start={{ x: 1, y: 1 }}
+        end={{ x: 0, y: 0 }}
+        style={{ position: 'absolute', bottom: -140, right: -100, width: 360, height: 360, borderRadius: 360 }}
+      />
+      <View style={styles.content}>
+        {/* Header */}
+        <View style={styles.header}> 
+          <View style={styles.logoWrapper}>
+            <LinearGradient
+              colors={["#7c3aed66", "#2563eb33", "transparent"]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.logoGlow}
             />
+            <BlurView intensity={50} tint="dark" style={styles.logoGlass}>
+              <View style={styles.logoInner}>
+                <Image
+                  source={{ uri: logoUri }}
+                  style={{ width: 72, height: 72, borderRadius: 12 }}
+                  resizeMode="contain"
+                />
+              </View>
+            </BlurView>
           </View>
-          {/* Variante texte dégradé, similaire au style web (version conservée) + halo lumineux */}
-          <View style={styles.brandWrap}>
-            {/* Couches de glow derrière le texte */}
-            <Text style={styles.glowTextStrong}>FleetChecks</Text>
-            <Text style={styles.glowTextSoft}>FleetChecks</Text>
-            <MaskedView
-              style={styles.brandMaskContainer}
-              maskElement={<Text style={styles.brandGradientMask}>FleetChecks</Text>}
-            >
-              <LinearGradient
-                colors={["#06b6d4", "#34d399", "#14b8a6"]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-              >
-                <Text style={styles.brandGradientFill}>FleetChecks</Text>
-              </LinearGradient>
-            </MaskedView>
-          </View>
-          <Text style={styles.subtitle}>Application Convoyeurs</Text>
+          <Text style={styles.title}>FleetCheck's</Text>
+          <Text style={styles.subtitle}>Gérez vos inspections véhicules</Text>
         </View>
 
-        <View style={styles.form}>
-          <View style={styles.inputContainer}>
-            <Text style={styles.label}>Email</Text>
-            <TextInput
-              style={styles.input}
-              value={email}
-              onChangeText={setEmail}
-              placeholder="votre.email@exemple.com"
-              keyboardType="email-address"
-              autoCapitalize="none"
-              autoCorrect={false}
-            />
+        {/* Card */}
+        <View style={styles.card}>
+          <View style={{ alignItems: 'center', marginBottom: 12 }}>
+            <Text style={styles.welcomeTitle}>Bienvenue</Text>
+            <Text style={styles.welcomeDesc}>Connectez-vous ou créez un compte pour accéder à FleetCheck's</Text>
+          </View>
+          {/* Tabs */}
+          <View style={styles.tabs}>
+            <TouchableOpacity onPress={() => setTab('login')} style={styles.tab}>
+              {tab === 'login' ? (
+                <LinearGradient colors={["#7c3aed", "#2563eb"]} start={{x:0, y:0}} end={{x:1, y:1}} style={styles.tabActiveBg}>
+                  <Text style={[styles.tabText, styles.tabTextActive]}>Connexion</Text>
+                </LinearGradient>
+              ) : (
+                <Text style={styles.tabText}>Connexion</Text>
+              )}
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => setTab('signup')} style={styles.tab}>
+              {tab === 'signup' ? (
+                <LinearGradient colors={["#f97316", "#ef4444"]} start={{x:0, y:0}} end={{x:1, y:1}} style={styles.tabActiveBg}>
+                  <Text style={[styles.tabText, styles.tabTextActive]}>Inscription</Text>
+                </LinearGradient>
+              ) : (
+                <Text style={styles.tabText}>Inscription</Text>
+              )}
+            </TouchableOpacity>
           </View>
 
-          <View style={styles.inputContainer}>
-            <Text style={styles.label}>Mot de passe</Text>
-            <TextInput
-              style={styles.input}
-              value={password}
-              onChangeText={setPassword}
-              placeholder="Votre mot de passe"
-              secureTextEntry
-              autoCapitalize="none"
-              autoCorrect={false}
-            />
-          </View>
+          {tab === 'login' ? (
+            <View style={styles.form}> 
+              <View style={styles.inputContainer}>
+                <Text style={styles.label}>Email</Text>
+                <TextInput
+                  style={styles.input}
+                  value={login.email}
+                  onChangeText={(t) => setLogin((p) => ({ ...p, email: t }))}
+                  placeholder="votre@email.com"
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                />
+              </View>
+              <View style={styles.inputContainer}>
+                <Text style={styles.label}>Mot de passe</Text>
+                <TextInput
+                  style={styles.input}
+                  value={login.password}
+                  onChangeText={(t) => setLogin((p) => ({ ...p, password: t }))}
+                  placeholder="••••••••"
+                  secureTextEntry
+                  autoCapitalize="none"
+                />
+              </View>
+              <TouchableOpacity onPress={handleLogin} disabled={loading}>
+                <LinearGradient
+                  colors={["#7c3aed", "#2563eb"]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={[styles.button, loading && styles.buttonDisabled]}
+                >
+                  <Text style={styles.buttonText}>{loading ? 'Connexion...' : 'Se connecter'}</Text>
+                </LinearGradient>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => login.email && resetPassword(login.email)} style={{ alignSelf: 'center', marginTop: 8 }}>
+                <Text style={{ color: '#93c5fd' }}>Mot de passe oublié ?</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <View style={styles.form}> 
+              <View style={styles.inputContainer}>
+                <Text style={styles.label}>Nom complet</Text>
+                <TextInput
+                  style={styles.input}
+                  value={signup.fullName}
+                  onChangeText={(t) => setSignup((p) => ({ ...p, fullName: t }))}
+                  placeholder="Votre nom complet"
+                />
+              </View>
+              <View style={styles.inputContainer}>
+                <Text style={styles.label}>Email</Text>
+                <TextInput
+                  style={styles.input}
+                  value={signup.email}
+                  onChangeText={(t) => setSignup((p) => ({ ...p, email: t }))}
+                  placeholder="votre@email.com"
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                />
+              </View>
+              <View style={styles.inputContainer}>
+                <Text style={styles.label}>Mot de passe</Text>
+                <TextInput
+                  style={styles.input}
+                  value={signup.password}
+                  onChangeText={(t) => setSignup((p) => ({ ...p, password: t }))}
+                  placeholder="••••••••"
+                  secureTextEntry
+                  autoCapitalize="none"
+                />
+              </View>
+              <TouchableOpacity onPress={handleSignup} disabled={loading}>
+                <LinearGradient
+                  colors={["#f97316", "#ef4444"]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={[styles.buttonAlt, loading && styles.buttonDisabled]}
+                >
+                  <Text style={styles.buttonText}>{loading ? 'Création...' : "Créer mon compte"}</Text>
+                </LinearGradient>
+              </TouchableOpacity>
+            </View>
+          )}
+        </View>
 
-          <TouchableOpacity
-            style={[styles.button, loading && styles.buttonDisabled]}
-            onPress={handleLogin}
-            disabled={loading || !email || !password}
-          >
-            <Text style={styles.buttonText}>
-              {loading ? 'Connexion...' : 'Se connecter'}
-            </Text>
+        <View style={styles.footer}> 
+          <Text style={styles.footerText}>En vous inscrivant, vous acceptez nos conditions d’utilisation.</Text>
+          <TouchableOpacity onPress={() => Linking.openURL(process.env.EXPO_PUBLIC_WEB_BASE_URL || 'https://app.fleetcheck.fr')} style={{ marginTop: 6 }}>
+            <Text style={{ color: '#a5b4fc' }}>Retour au site web</Text>
           </TouchableOpacity>
         </View>
-
-        <View style={styles.footer}>
-          <Text style={styles.footerText}>
-            Application réservée aux convoyeurs autorisés
-          </Text>
-        </View>
-  </View>
-  </LinearGradient>
+      </View>
     </KeyboardAvoidingView>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  gradient: { flex: 1 },
+  container: { flex: 1, backgroundColor: '#0b1020' },
   content: {
     flex: 1,
     justifyContent: 'center',
@@ -147,114 +213,64 @@ const styles = StyleSheet.create({
   },
   header: {
     alignItems: 'center',
-    marginBottom: 48,
+    marginBottom: 24,
   },
   title: {
     fontSize: 32,
     fontWeight: 'bold',
-  color: tokens.colors.onSurface,
-    marginBottom: 8,
+    color: '#fff',
+    marginBottom: 6,
   },
   subtitle: {
     fontSize: 16,
-  color: tokens.colors.onPrimary,
-    textShadowColor: 'rgba(0,0,0,0.2)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 2,
+    color: 'rgba(255,255,255,0.7)',
   },
-  brandWrap: {
-    marginBottom: 14,
-    alignSelf: 'center',
-    position: 'relative',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  brandMaskContainer: {
-    // Aligné au centre, s'adapte au texte
-  },
-  brandGradientMask: {
-  fontSize: 28,
-    fontWeight: '800',
-    color: '#000',
-    letterSpacing: 0.2,
-  },
-  brandGradientFill: {
-  fontSize: 28,
-    fontWeight: '800',
-    // Rendre le texte invisible, seule la zone masque importe
-    color: 'transparent',
-    paddingHorizontal: 4,
-  },
-  glowTextStrong: {
-    position: 'absolute',
-    fontSize: 28,
-    fontWeight: '800',
-    // Couleur du texte quasi-transparente pour ne garder que le halo
-    color: 'rgba(0,0,0,0.02)',
-    textShadowColor: 'rgba(52, 211, 153, 0.85)', // vert clair
-    textShadowOffset: { width: 0, height: 0 },
-    textShadowRadius: 12,
-  },
-  glowTextSoft: {
-    position: 'absolute',
-    fontSize: 28,
-    fontWeight: '800',
-    color: 'rgba(0,0,0,0.01)',
-    textShadowColor: 'rgba(6, 182, 212, 0.45)', // cyan doux
-    textShadowOffset: { width: 0, height: 0 },
-    textShadowRadius: 22,
-  },
-  logoWrap: {
-    position: 'relative',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 12,
-  },
-  logoImage: {
-    resizeMode: 'contain',
-  },
-  form: {
-    marginBottom: 32,
-  },
+  logoWrapper: { position: 'relative', marginBottom: 16 },
+  logoGlow: { position: 'absolute', top: -16, left: -16, right: -16, bottom: -16, borderRadius: 28 },
+  logoGlass: { borderRadius: 20, overflow: 'hidden', borderWidth: 1, borderColor: 'rgba(255,255,255,0.18)', backgroundColor: 'rgba(255,255,255,0.08)' },
+  logoInner: { padding: 14, alignItems: 'center', justifyContent: 'center' },
+  form: { marginTop: 12, marginBottom: 8 },
   inputContainer: {
     marginBottom: 16,
   },
   label: {
     fontSize: 14,
     fontWeight: '500',
-  color: tokens.colors.onSurface,
+    color: '#cbd5e1',
     marginBottom: 6,
   },
   input: {
-  backgroundColor: tokens.colors.surface,
-    borderRadius: 8,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    borderRadius: 12,
     padding: 16,
     fontSize: 16,
     borderWidth: 1,
-  borderColor: tokens.colors.border,
-  color: tokens.colors.onSurface,
+    borderColor: 'rgba(255,255,255,0.12)',
+    color: '#fff',
   },
-  button: {
-  backgroundColor: tokens.colors.primary,
-    borderRadius: 8,
-    padding: 16,
-    alignItems: 'center',
-    marginTop: 8,
-  },
+  button: { backgroundColor: '#7c3aed', borderRadius: 12, padding: 16, alignItems: 'center', marginTop: 8 },
+  buttonAlt: { backgroundColor: '#f97316', borderRadius: 12, padding: 16, alignItems: 'center', marginTop: 8 },
   buttonDisabled: {
-  backgroundColor: tokens.colors.border,
+    backgroundColor: '#9ca3af',
   },
   buttonText: {
-  color: tokens.colors.onPrimary,
+    color: 'white',
     fontSize: 16,
     fontWeight: '600',
   },
-  footer: {
-    alignItems: 'center',
-  },
+  footer: { alignItems: 'center', marginTop: 16 },
   footerText: {
     fontSize: 12,
-  color: tokens.colors.onSurface,
+    color: 'rgba(255,255,255,0.6)',
     textAlign: 'center',
   },
+  card: { backgroundColor: 'rgba(255,255,255,0.08)', borderColor: 'rgba(255,255,255,0.12)', borderWidth: 1, borderRadius: 16, padding: 16 },
+  welcomeTitle: { fontSize: 22, fontWeight: '800', color: '#e9d5ff' },
+  welcomeDesc: { fontSize: 13, color: 'rgba(255,255,255,0.7)', textAlign: 'center', marginTop: 4 },
+  tabs: { flexDirection: 'row', backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: 12, overflow: 'hidden' },
+  tab: { flex: 1, paddingVertical: 0, alignItems: 'center', justifyContent: 'center' },
+  tabActive: { backgroundColor: '#7c3aed' },
+  tabActiveBg: { width: '100%', paddingVertical: 12, alignItems: 'center' },
+  tabText: { color: 'rgba(255,255,255,0.7)', fontWeight: '600' },
+  tabTextActive: { color: '#fff' },
 });

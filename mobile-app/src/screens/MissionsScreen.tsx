@@ -10,15 +10,16 @@ import {
   TextInput,
   ScrollView,
 } from 'react-native';
+import { Share, Linking } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useMissions, useUpdateMissionStatus } from '../hooks/useMissions';
 import { Mission } from '../types';
 import { useNavigation } from '@react-navigation/native';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../config/supabase';
+import { WEB_BASE_URL } from '../config/app';
 import { useQueryClient } from '@tanstack/react-query';
 import Toast from 'react-native-toast-message';
-import { tokens } from '../theme';
 
 export const MissionsScreen: React.FC = () => {
   const { data: missions, isLoading, refetch } = useMissions();
@@ -54,12 +55,33 @@ export const MissionsScreen: React.FC = () => {
   const [deliveryTime, setDeliveryTime] = useState('');
   // Assignation
   const [assignedTo, setAssignedTo] = useState<'self' | 'contact'>('self');
-  const [contacts, setContacts] = useState<Array<{ id: string; invited_user_id?: string | null; name?: string | null; email: string; status: string }>>([]);
+  type ContactLite = { id: string; invited_user_id: string | null; name: string | null; email: string; status: string };
+  const [contacts, setContacts] = useState<ContactLite[]>([]);
   const [selectedContactUserId, setSelectedContactUserId] = useState<string | null>(null);
   // Revenus
   const [donorEarning, setDonorEarning] = useState('');
   const [driverEarning, setDriverEarning] = useState('');
   const [creating, setCreating] = useState(false);
+  
+  const buildPublicTrackingUrl = (token: string) => {
+    const base = WEB_BASE_URL || 'https://app.fleetcheck.fr';
+    return `${base}/public-tracking/${token}`;
+  };
+
+  const sharePublicLink = async (missionId: string) => {
+    try {
+      const { data, error } = await supabase.functions.invoke('generate-tracking-link', {
+        body: { missionId },
+      });
+      if (error) throw error;
+      const token = (data as any)?.trackingToken as string | undefined;
+      if (!token) throw new Error('Token introuvable');
+      const url = buildPublicTrackingUrl(token);
+      await Share.share({ message: url });
+    } catch (e: any) {
+      Toast.show({ type: 'error', text1: 'Erreur', text2: e?.message || 'Génération du lien impossible' });
+    }
+  };
 
   const openCreateIfRequested = () => {
     // @ts-ignore: accès permissif aux params
@@ -80,13 +102,13 @@ export const MissionsScreen: React.FC = () => {
   useEffect(() => {
     const loadContacts = async () => {
       if (!user?.id) return;
-      const { data, error } = await supabase
+  const { data, error } = await supabase
         .from('contacts')
         .select('id, invited_user_id, name, email, status')
         .eq('user_id', user.id)
         .eq('status', 'accepted')
         .order('created_at', { ascending: false });
-      if (!error) setContacts(data || []);
+  if (!error) setContacts(((data as any[]) || []) as ContactLite[]);
     };
     loadContacts();
   }, [user?.id, createVisible]);
@@ -185,6 +207,7 @@ export const MissionsScreen: React.FC = () => {
         created_by: user.id,
         driver_id: driverId,
         status: 'pending',
+        kind: 'inspection',
       };
 
       const { error } = await supabase.from('missions').insert(payload);
@@ -281,15 +304,15 @@ export const MissionsScreen: React.FC = () => {
   );
 
   return (
-  <View style={styles.container}>
+    <View style={styles.container}>
       {/* Bouton d'ajout en haut de liste */}
       <View style={{ paddingHorizontal: 16, paddingTop: 12 }}>
-  <TouchableOpacity style={{ alignSelf: 'flex-start', backgroundColor: tokens.colors.primary, paddingHorizontal: 12, paddingVertical: 10, borderRadius: 8, flexDirection: 'row', alignItems: 'center', gap: 8 }} onPress={() => {
+        <TouchableOpacity style={{ alignSelf: 'flex-start', backgroundColor: '#2563eb', paddingHorizontal: 12, paddingVertical: 10, borderRadius: 8, flexDirection: 'row', alignItems: 'center', gap: 8 }} onPress={() => {
           // @ts-ignore
           navigation.navigate('NewMissionWizard');
         }}>
-          <Ionicons name="add" size={18} color={tokens.colors.onPrimary} />
-          <Text style={{ color: tokens.colors.onPrimary, fontWeight: '600' }}>Nouvelle mission</Text>
+          <Ionicons name="add" size={18} color="#fff" />
+          <Text style={{ color: '#fff', fontWeight: '600' }}>Nouvelle mission</Text>
         </TouchableOpacity>
       </View>
 
@@ -372,6 +395,24 @@ export const MissionsScreen: React.FC = () => {
                   <Text style={styles.actionButtonText}>Ouvrir l'état des lieux</Text>
                 </TouchableOpacity>
 
+                <TouchableOpacity
+                  style={[styles.actionButton, { backgroundColor: '#6b7280' }]}
+                  onPress={() => sharePublicLink(selectedMission.id)}
+                >
+                  <Text style={styles.actionButtonText}>Partager le suivi</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.actionButton, { backgroundColor: '#111827' }]}
+                  onPress={() => {
+                    setModalVisible(false);
+                    // @ts-ignore
+                    navigation.navigate('EditMission', { missionId: selectedMission.id });
+                  }}
+                >
+                  <Text style={styles.actionButtonText}>Modifier</Text>
+                </TouchableOpacity>
+
                 {selectedMission.status === 'pending' && (
                   <TouchableOpacity
                     style={[styles.actionButton, { backgroundColor: '#2563eb' }]}
@@ -401,17 +442,20 @@ export const MissionsScreen: React.FC = () => {
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: tokens.colors.background },
+  container: {
+    flex: 1,
+    backgroundColor: '#f8fafc',
+  },
   listContainer: {
     padding: 16,
   },
   missionCard: {
-    backgroundColor: tokens.colors.surface,
+    backgroundColor: 'white',
     borderRadius: 12,
     padding: 16,
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: tokens.colors.border,
+    borderColor: '#e5e7eb',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.05,
@@ -431,12 +475,12 @@ const styles = StyleSheet.create({
   missionTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: tokens.colors.onSurface,
+    color: '#1f2937',
     marginBottom: 4,
   },
   missionRef: {
     fontSize: 14,
-    color: tokens.colors.onSurface,
+    color: '#6b7280',
   },
   statusBadge: {
     paddingHorizontal: 12,
@@ -458,7 +502,7 @@ const styles = StyleSheet.create({
   },
   addressText: {
     fontSize: 14,
-    color: tokens.colors.onSurface,
+    color: '#374151',
     marginLeft: 8,
     flex: 1,
   },
@@ -468,7 +512,7 @@ const styles = StyleSheet.create({
   },
   dateText: {
     fontSize: 12,
-    color: tokens.colors.onSurface,
+    color: '#6b7280',
     marginLeft: 6,
   },
   emptyContainer: {
@@ -479,21 +523,21 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     fontSize: 16,
-    color: tokens.colors.onSurface,
+    color: '#6b7280',
     marginTop: 16,
   },
-  formLabel: { fontSize: 14, color: tokens.colors.onSurface, marginBottom: 6, fontWeight: '600' },
-  input: { backgroundColor: tokens.colors.surface, borderWidth: 1, borderColor: tokens.colors.border, borderRadius: 8, padding: 12, marginBottom: 12 },
-  createButton: { backgroundColor: tokens.colors.primary, padding: 14, borderRadius: 8, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
-  createButtonText: { color: tokens.colors.onPrimary, fontWeight: '700' },
-  sectionMinorTitle: { fontSize: 16, fontWeight: '700', color: tokens.colors.onSurface, marginTop: 8, marginBottom: 8 },
-  chipSmall: { paddingHorizontal: 8, paddingVertical: 6, backgroundColor: tokens.colors.border, borderRadius: 999 },
-  chipActive: { backgroundColor: tokens.colors.primary },
-  chipText: { color: tokens.colors.onSurface, fontWeight: '600' },
-  chipTextActive: { color: tokens.colors.onPrimary },
+  formLabel: { fontSize: 14, color: '#374151', marginBottom: 6, fontWeight: '600' },
+  input: { backgroundColor: 'white', borderWidth: 1, borderColor: '#e5e7eb', borderRadius: 8, padding: 12, marginBottom: 12 },
+  createButton: { backgroundColor: '#2563eb', padding: 14, borderRadius: 8, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
+  createButtonText: { color: 'white', fontWeight: '700' },
+  sectionMinorTitle: { fontSize: 16, fontWeight: '700', color: '#1f2937', marginTop: 8, marginBottom: 8 },
+  chipSmall: { paddingHorizontal: 8, paddingVertical: 6, backgroundColor: '#e5e7eb', borderRadius: 999 },
+  chipActive: { backgroundColor: '#2563eb' },
+  chipText: { color: '#111827', fontWeight: '600' },
+  chipTextActive: { color: 'white' },
   modalContainer: {
     flex: 1,
-    backgroundColor: tokens.colors.surface,
+    backgroundColor: 'white',
   },
   modalHeader: {
     flexDirection: 'row',
@@ -501,12 +545,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 20,
     borderBottomWidth: 1,
-    borderBottomColor: tokens.colors.border,
+    borderBottomColor: '#e5e7eb',
   },
   modalTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: tokens.colors.onSurface,
+    color: '#1f2937',
   },
   modalContent: {
     flex: 1,
@@ -514,7 +558,7 @@ const styles = StyleSheet.create({
   },
   modalRef: {
     fontSize: 16,
-    color: tokens.colors.onSurface,
+    color: '#6b7280',
     marginBottom: 20,
   },
   section: {
@@ -523,12 +567,12 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: tokens.colors.onSurface,
+    color: '#1f2937',
     marginBottom: 12,
   },
   sectionText: {
     fontSize: 14,
-    color: tokens.colors.onSurface,
+    color: '#374151',
     lineHeight: 20,
   },
   addressDetail: {
@@ -537,12 +581,12 @@ const styles = StyleSheet.create({
   addressLabel: {
     fontSize: 14,
     fontWeight: '500',
-    color: tokens.colors.onSurface,
+    color: '#6b7280',
     marginBottom: 4,
   },
   addressValue: {
     fontSize: 14,
-    color: tokens.colors.onSurface,
+    color: '#1f2937',
   },
   currentStatus: {
     alignSelf: 'flex-start',
@@ -551,7 +595,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
   },
   currentStatusText: {
-  color: tokens.colors.onPrimary,
+    color: 'white',
     fontWeight: '600',
   },
   actionButtons: {
@@ -564,7 +608,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   actionButtonText: {
-  color: tokens.colors.onPrimary,
+    color: 'white',
     fontSize: 16,
     fontWeight: '600',
   },

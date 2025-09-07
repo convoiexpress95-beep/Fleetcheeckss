@@ -1,54 +1,85 @@
-import type { MD3Theme } from 'react-native-paper';
-import { MD3DarkTheme } from 'react-native-paper';
-import type { Theme as NavigationTheme } from '@react-navigation/native';
-import { DarkTheme as NavigationDarkTheme } from '@react-navigation/native';
+import { DarkTheme as NavigationDarkTheme, DefaultTheme as NavigationLightTheme, Theme as NavigationTheme } from '@react-navigation/native';
+import { MD3DarkTheme as PaperDarkTheme, MD3LightTheme as PaperLightTheme, MD3Theme as PaperTheme } from 'react-native-paper';
 
-// Tokens alignés sur src/index.css (web)
-export const tokens = {
-  radius: 12, // ~0.75rem
-  colors: {
-    background: '#06090f', // hsl(220,30%,3%) approx
-    card: '#0a0f17',       // hsl(220,25%,4%) approx
-    surface: '#0a0f17',
-    onSurface: '#e6fffe',  // hsl(180,100%,98%) approx
-    primary: '#00ffff',    // hsl(180,100%,50%)
-    onPrimary: '#051013',  // proche du fond sombre
-    accent: '#00c8ff',     // hsl(195,100%,45%) approx
-    border: '#111827',     // proche hsl(240,3.7%,8%)
-  }
+export const colors = {
+	background: '#0b1020',
+	surface: 'rgba(255,255,255,0.08)',
+	surfaceBorder: 'rgba(255,255,255,0.12)',
+	text: '#ffffff',
+	textMuted: 'rgba(255,255,255,0.7)',
+	primary: '#2563eb',
+	secondary: '#7c3aed',
+	accent: '#f97316',
+	headerBg: '#0b1020',
+	tabBg: '#0b1020',
+	tabBorder: '#1f2937',
 };
 
-export const paperTheme: MD3Theme = {
-  ...MD3DarkTheme,
-  roundness: tokens.radius,
-  colors: {
-    ...MD3DarkTheme.colors,
-    primary: tokens.colors.primary,
-    secondary: tokens.colors.accent,
-    background: tokens.colors.background,
-    surface: tokens.colors.surface,
-    surfaceVariant: tokens.colors.card,
-    onSurface: tokens.colors.onSurface,
-    onPrimary: tokens.colors.onPrimary,
-    outline: tokens.colors.border,
-  },
-  fonts: {
-    ...MD3DarkTheme.fonts,
-    // Les fontes réelles seront mappées après chargement dans App.tsx via PaperProvider
-  },
+// Alias rétrocompatibilité
+export const tokens = colors;
+
+export const navigationTheme: NavigationTheme = {
+	...NavigationDarkTheme,
+	colors: {
+		...NavigationDarkTheme.colors,
+		background: colors.background,
+		card: colors.headerBg,
+		primary: colors.primary,
+		text: colors.text,
+		border: colors.tabBorder,
+		notification: colors.accent,
+	},
 };
 
-export const navTheme: NavigationTheme = {
-  ...NavigationDarkTheme,
-  colors: {
-    ...NavigationDarkTheme.colors,
-    primary: tokens.colors.primary,
-    background: tokens.colors.background,
-    card: tokens.colors.card,
-    text: tokens.colors.onSurface,
-    border: tokens.colors.border,
-    notification: tokens.colors.accent,
-  },
+export const paperTheme: PaperTheme = {
+	...PaperDarkTheme,
+	colors: {
+		...PaperDarkTheme.colors,
+		background: colors.background,
+		surface: colors.surface,
+		primary: colors.primary,
+		secondary: colors.secondary as any,
+		onSurface: colors.text,
+	},
 };
 
-export default { paperTheme, navTheme, tokens };
+// Variantes claires
+export const colorsLight = {
+	background: '#ffffff',
+	surface: '#ffffff',
+	surfaceBorder: '#e5e7eb',
+	text: '#111827',
+	textMuted: '#6b7280',
+	primary: '#2563eb',
+	secondary: '#7c3aed',
+	accent: '#0ea5e9',
+	headerBg: '#ffffff',
+	tabBg: '#ffffff',
+	tabBorder: '#e5e7eb',
+};
+
+export const navigationThemeLight: NavigationTheme = {
+	...NavigationLightTheme,
+	colors: {
+		...NavigationLightTheme.colors,
+		background: colorsLight.background,
+		card: colorsLight.headerBg,
+		primary: colorsLight.primary,
+		text: colorsLight.text,
+		border: colorsLight.tabBorder,
+		notification: colorsLight.accent,
+	},
+};
+
+export const paperThemeLight: PaperTheme = {
+	...PaperLightTheme,
+	colors: {
+		...PaperLightTheme.colors,
+		background: colorsLight.background,
+		surface: colorsLight.surface,
+		primary: colorsLight.primary,
+		secondary: colorsLight.secondary as any,
+		onSurface: colorsLight.text,
+	},
+};
+
