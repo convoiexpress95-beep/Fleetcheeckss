@@ -11,7 +11,7 @@ import { useAuth } from '@/contexts/AuthContext';
 export const MobilePushNotificationDemo = () => {
   const { user } = useAuth();
   const sendNotification = useSendNotification();
-  const [title, setTitle] = useState('FleetCheck - Nouvelle mission');
+  const [title, setTitle] = useState('FleetCheecks - Nouvelle mission');
   const [message, setMessage] = useState('Une nouvelle mission vous a été assignée. Cliquez pour voir les détails.');
   const [data, setData] = useState('{"mission_id": "demo-123"}');
 
@@ -102,7 +102,7 @@ export const MobilePushNotificationDemo = () => {
           <Button 
             variant="outline"
             onClick={() => {
-              setTitle('FleetCheck - Nouvelle mission');
+              setTitle('FleetCheecks - Nouvelle mission');
               setMessage('Une nouvelle mission vous a été assignée. Cliquez pour voir les détails.');
               setData('{"mission_id": "demo-123"}');
             }}

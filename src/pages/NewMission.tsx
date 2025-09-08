@@ -1,5 +1,5 @@
-import React, { useMemo, useState } from 'react';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import React, { useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { useCreateMission } from '@/hooks/useMissions';
 import { useMyContacts } from '@/hooks/useContacts';
 import { Button } from '@/components/ui/button';
@@ -8,21 +8,19 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { ArrowLeft, Plus, Building2, User, MapPin, Clock, Users, Download } from 'lucide-react';
-import { Checkbox } from '@/components/ui/checkbox';
-import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '@/contexts/AuthContext';
-import { toast } from '@/hooks/use-toast';
-import MissionRecap from '@/components/MissionRecap';
-import jsPDF from 'jspdf';
-import html2canvas from 'html2canvas';
+import { ArrowLeft, Plus, Car, Truck, Building2, User, MapPin, Clock, Users } from 'lucide-react';
+import { useVehicleModels } from '@/hooks/useVehicleModels';
+import VehicleImage from '@/components/VehicleImage';
+import VehicleImagePicker from '@/components/VehicleImagePicker';
+import { useToast } from '@/hooks/use-toast';
 
 const NewMission = () => {
   const navigate = useNavigate();
   const createMission = useCreateMission();
-  const [params] = useSearchParams();
   const { data: contacts } = useMyContacts();
-  const { user } = useAuth();
+  const { data: vehicleModels = [] } = useVehicleModels();
+  const [imagePickerOpen, setImagePickerOpen] = useState(false);
+  const { toast } = useToast();
   
   const [formData, setFormData] = useState({
     title: '',
@@ -41,63 +39,27 @@ const NewMission = () => {
     delivery_time: '',
     vehicle_type: '',
   license_plate: '',
-    vehicle_brand: '',
-    vehicle_model: '',
+  vehicle_brand: '',
+  vehicle_model: '',
+  vehicle_model_id: '',
+  vehicle_body_type: '',
+  vehicle_image_path: '',
     vehicle_year: '',
     assigned_to: 'self',
     assigned_contact_id: '',
-    // revenus retirés du wizard (demandé)
+    donor_earning: '',
+    driver_earning: '',
   });
-  const [confirmCredit, setConfirmCredit] = useState(false);
-
-  // Pré-remplir depuis querystring (depuis Contacts: Créer mission)
-  const prefillAssigned = useMemo(() => ({
-    assigned_to: params.get('assigned_to') || undefined,
-    assigned_contact_id: params.get('assigned_contact_id') || undefined,
-  }), [params]);
-  React.useEffect(() => {
-    setFormData(prev => ({
-      ...prev,
-      ...(prefillAssigned.assigned_to ? { assigned_to: prefillAssigned.assigned_to as 'self' | 'contact' } : {}),
-      ...(prefillAssigned.assigned_contact_id ? { assigned_contact_id: prefillAssigned.assigned_contact_id } : {}),
-    }));
-  }, [prefillAssigned]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     try {
-      // Empêche la soumission avant la dernière étape (Enter ou clic involontaire)
-      if (wizardStep < steps.length) {
-        setWizardStep((s) => Math.min(steps.length, s + 1));
+      if (!formData.vehicle_image_path) {
+        toast({ title: 'Image requise', description: 'Veuillez choisir une image du véhicule (catalog/...)' });
         return;
       }
-  const { assigned_to, assigned_contact_id, pickup_time, delivery_time, ...missionData } = formData;
-
-      // Résoudre driver_id si assignation à un contact
-      let driverUserId: string | null = null;
-      if (assigned_to === 'contact') {
-        if (!assigned_contact_id) {
-          toast({ title: 'Assignation manquante', description: 'Veuillez sélectionner un contact.', variant: 'destructive' });
-          return;
-        }
-        const { data: contactRow, error: contactErr } = await supabase
-          .from('contacts')
-          .select('invited_user_id,status')
-          .eq('id', assigned_contact_id)
-          .eq('user_id', user?.id || '')
-          .maybeSingle();
-        if (contactErr) throw contactErr;
-        if (!contactRow?.invited_user_id || contactRow.status !== 'accepted') {
-          toast({
-            title: 'Assignation impossible',
-            description: "Ce contact n'a pas encore de compte ou l'invitation n'est pas acceptée.",
-            variant: 'destructive',
-          });
-          return;
-        }
-        driverUserId = contactRow.invited_user_id;
-      }
+      const { assigned_to, assigned_contact_id, pickup_time, delivery_time, ...missionData } = formData;
       
       // Combine date and time fields into proper timestamps
       const combineDateTime = (date: string, time: string) => {
@@ -123,11 +85,16 @@ const NewMission = () => {
         delivery_contact_name: missionData.delivery_contact_name || null,
         delivery_contact_phone: missionData.delivery_contact_phone || null,
         delivery_contact_email: missionData.delivery_contact_email || null,
-        vehicle_brand: missionData.vehicle_brand || null,
-        vehicle_model: missionData.vehicle_model || null,
-        license_plate: missionData.license_plate || null,
+  vehicle_brand: missionData.vehicle_brand || null,
+  vehicle_model: missionData.vehicle_model || null,
+  vehicle_model_id: missionData.vehicle_model_id || null,
+  vehicle_body_type: missionData.vehicle_body_type || null,
+  vehicle_image_path: missionData.vehicle_image_path || null,
+  license_plate: missionData.license_plate || null,
         vehicle_year: missionData.vehicle_year ? Number(missionData.vehicle_year) : null,
-        driver_id: assigned_to === 'self' ? null : driverUserId,
+        donor_earning: missionData.donor_earning ? Number(missionData.donor_earning) : null,
+        driver_earning: missionData.driver_earning ? Number(missionData.driver_earning) : null,
+        driver_id: assigned_to === 'self' ? null : (assigned_contact_id || null),
         pickup_date: combineDateTime(formData.pickup_date, formData.pickup_time),
         delivery_date: combineDateTime(formData.delivery_date, formData.delivery_time)
       };
@@ -146,54 +113,6 @@ const NewMission = () => {
 
   const handleSelectChange = (name: string, value: string) => {
     setFormData(prev => ({ ...prev, [name]: value }));
-  };
-
-  // Wizard État des lieux
-  const [wizardStep, setWizardStep] = useState(1);
-  const steps = [
-    { id: 1, label: "Infos mission" },
-    { id: 2, label: "Logistique" },
-    { id: 3, label: "Assignation" },
-    { id: 4, label: "Récapitulatif" },
-  ];
-  const progress = (wizardStep - 1) / (steps.length - 1) * 100;
-
-  const nextStep = () => setWizardStep(s => Math.min(steps.length, s + 1));
-  const prevStep = () => setWizardStep(s => Math.max(1, s - 1));
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLFormElement>) => {
-    if (e.key === 'Enter' && wizardStep < steps.length) {
-      e.preventDefault();
-      nextStep();
-    }
-  };
-
-  // Export PDF du récapitulatif
-  const recapRef = React.useRef<HTMLDivElement>(null);
-  const handleDownloadPdf = async () => {
-    if (!recapRef.current) return;
-    const canvas = await html2canvas(recapRef.current, { scale: 2, backgroundColor: '#ffffff' });
-    const imgData = canvas.toDataURL('image/png');
-    const pdf = new jsPDF({ orientation: 'p', unit: 'pt', format: 'a4' });
-    const pageWidth = pdf.internal.pageSize.getWidth();
-    const pageHeight = pdf.internal.pageSize.getHeight();
-    const imgWidth = pageWidth;
-    const imgHeight = (canvas.height * imgWidth) / canvas.width;
-    let position = 0;
-
-    if (imgHeight < pageHeight) {
-      pdf.addImage(imgData, 'PNG', 0, 0, imgWidth, imgHeight, undefined, 'FAST');
-    } else {
-      // Multi-page si nécessaire
-      let remaining = imgHeight;
-      let y = 0;
-      while (remaining > 0) {
-        pdf.addImage(imgData, 'PNG', 0, y, imgWidth, imgHeight, undefined, 'FAST');
-        remaining -= pageHeight;
-        y -= pageHeight;
-        if (remaining > 0) pdf.addPage();
-      }
-    }
-    pdf.save(`mission-recap-${Date.now()}.pdf`);
   };
 
   return (
@@ -231,21 +150,8 @@ const NewMission = () => {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            {/* Barre de progression du wizard */}
-            <div className="mb-6">
-              <div className="h-2 w-full bg-white/10 rounded-full overflow-hidden">
-                <div className="h-2 bg-gradient-cosmic rounded-full transition-all" style={{ width: `${progress}%` }} />
-              </div>
-              <div className="mt-2 grid grid-cols-4 text-xs text-muted-foreground">
-                {steps.map((s) => (
-                  <div key={s.id} className={`text-center ${wizardStep === s.id ? 'text-foreground font-semibold' : ''}`}>{s.label}</div>
-                ))}
-              </div>
-            </div>
-
-            <form onSubmit={handleSubmit} onKeyDown={handleKeyDown} className="space-y-8">
+            <form onSubmit={handleSubmit} className="space-y-8">
               {/* Informations générales */}
-              {wizardStep === 1 && (
               <div className="space-y-6">
                 <div className="flex items-center gap-3">
                   <div className="p-2 bg-gradient-cosmic rounded-lg">
@@ -312,6 +218,38 @@ const NewMission = () => {
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    {/* Image véhicule */}
+                    <div className="space-y-2 md:col-span-3">
+                      <Label>Image du véhicule (85 images catalogue)</Label>
+                      <div className="flex items-start gap-4">
+                        <div className="w-48">
+                          <VehicleImage imagePath={formData.vehicle_image_path || undefined} bodyType={formData.vehicle_body_type || undefined} alt="Prévisualisation" />
+                        </div>
+                        <div className="flex flex-col gap-2">
+                          <Button type="button" variant="outline" onClick={() => setImagePickerOpen(true)}>Choisir dans le catalogue</Button>
+                          <Input
+                            placeholder="ex: catalog/peugeot_208.webp"
+                            value={formData.vehicle_image_path}
+                            onChange={(e) => setFormData(prev => ({ ...prev, vehicle_image_path: e.target.value }))}
+                          />
+                          <p className="text-xs text-muted-foreground">Les 85 images doivent être téléversées dans Supabase Storage (bucket 'vehicle-assets', dossier 'catalog').</p>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="space-y-2 md:col-span-3">
+                      <Label>Modèle (catalogue)</Label>
+                      <Select value={formData.vehicle_model_id} onValueChange={(v) => setFormData(prev => ({ ...prev, vehicle_model_id: v }))}>
+                        <SelectTrigger className="glass-input">
+                          <SelectValue placeholder="Sélectionner un modèle (facultatif)" />
+                        </SelectTrigger>
+                        <SelectContent className="glass-card border-white/20 max-h-64 overflow-auto">
+                          {vehicleModels.map((vm: any) => (
+                            <SelectItem key={vm.id} value={vm.id}>{vm.make} {vm.model}{vm.generation ? ` • ${vm.generation}` : ''} ({vm.body_type})</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <p className="text-xs text-muted-foreground">Choisissez un modèle pour afficher l'image correspondante dans le marketplace.</p>
+                    </div>
                     <div className="space-y-2">
                       <Label htmlFor="vehicle_brand">Marque</Label>
                       <Input
@@ -348,13 +286,24 @@ const NewMission = () => {
                         className="glass-input"
                       />
                     </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="vehicle_body_type">Type carrosserie</Label>
+                      <Select value={formData.vehicle_body_type} onValueChange={(v) => setFormData(prev => ({ ...prev, vehicle_body_type: v }))}>
+                        <SelectTrigger className="glass-input">
+                          <SelectValue placeholder="berline, suv, utilitaire…" />
+                        </SelectTrigger>
+                        <SelectContent className="glass-card border-white/20">
+                          {['berline','suv','utilitaire','hatchback','break','monospace','pickup','camion','moto','autre'].map(t => (
+                            <SelectItem key={t} value={t}>{t}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </div>
                 </div>
               </div>
-              )}
 
               {/* Détails logistiques */}
-              {wizardStep === 2 && (
               <div className="space-y-6">
                 <div className="flex items-center gap-3">
                   <div className="p-2 bg-gradient-sunset rounded-lg">
@@ -367,7 +316,7 @@ const NewMission = () => {
 
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                   {/* Départ */}
-                  <div className="space-y-4 p-4 rounded-lg border border-white/15 bg-background/90">
+                  <div className="space-y-4 p-4 glass-card rounded-lg border-white/10">
                     <h4 className="font-semibold text-green-200 flex items-center gap-2">
                       <div className="w-3 h-3 bg-green-400 rounded-full"></div>
                       Point de départ
@@ -400,28 +349,57 @@ const NewMission = () => {
                     <div className="grid grid-cols-2 gap-2">
                       <div className="space-y-2">
                         <Label htmlFor="pickup_contact_phone">Téléphone</Label>
-                        <Input id="pickup_contact_phone" name="pickup_contact_phone" value={formData.pickup_contact_phone} onChange={handleChange} placeholder="06 12 34 56 78" className="glass-input" />
+                        <Input
+                          id="pickup_contact_phone"
+                          name="pickup_contact_phone"
+                          value={formData.pickup_contact_phone}
+                          onChange={handleChange}
+                          placeholder="06 12 34 56 78"
+                          className="glass-input"
+                        />
                       </div>
                       <div className="space-y-2">
                         <Label htmlFor="pickup_contact_email">Email</Label>
-                        <Input id="pickup_contact_email" name="pickup_contact_email" value={formData.pickup_contact_email} onChange={handleChange} placeholder="contact@email.com" type="email" className="glass-input" />
+                        <Input
+                          id="pickup_contact_email"
+                          name="pickup_contact_email"
+                          value={formData.pickup_contact_email}
+                          onChange={handleChange}
+                          placeholder="contact@email.com"
+                          type="email"
+                          className="glass-input"
+                        />
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-3">
+                    <div className="grid grid-cols-2 gap-2">
                       <div className="space-y-2">
                         <Label htmlFor="pickup_date">Date de départ</Label>
-                        <Input id="pickup_date" name="pickup_date" value={formData.pickup_date} onChange={handleChange} type="date" className="glass-input" />
+                        <Input
+                          id="pickup_date"
+                          name="pickup_date"
+                          value={formData.pickup_date}
+                          onChange={handleChange}
+                          type="date"
+                          className="glass-input"
+                        />
                       </div>
                       <div className="space-y-2">
                         <Label htmlFor="pickup_time">Heure de départ</Label>
-                        <Input id="pickup_time" name="pickup_time" value={formData.pickup_time} onChange={handleChange} type="time" className="glass-input" />
+                        <Input
+                          id="pickup_time"
+                          name="pickup_time"
+                          value={formData.pickup_time}
+                          onChange={handleChange}
+                          type="time"
+                          className="glass-input"
+                        />
                       </div>
                     </div>
                   </div>
 
                   {/* Arrivée */}
-                  <div className="space-y-4 p-4 rounded-lg border border-white/15 bg-background/90">
+                  <div className="space-y-4 p-4 glass-card rounded-lg border-white/10">
                     <h4 className="font-semibold text-red-200 flex items-center gap-2">
                       <div className="w-3 h-3 bg-red-400 rounded-full"></div>
                       Point d'arrivée
@@ -429,42 +407,83 @@ const NewMission = () => {
                     
                     <div className="space-y-2">
                       <Label htmlFor="delivery_address">Adresse d'arrivée *</Label>
-                      <Input id="delivery_address" name="delivery_address" value={formData.delivery_address} onChange={handleChange} placeholder="456 Avenue des Champs, Paris" className="glass-input" />
+                      <Input
+                        id="delivery_address"
+                        name="delivery_address"
+                        value={formData.delivery_address}
+                        onChange={handleChange}
+                        placeholder="456 Avenue des Champs, Paris"
+                        className="glass-input"
+                      />
                     </div>
 
                     <div className="space-y-2">
                       <Label htmlFor="delivery_contact_name">Contact d'arrivée</Label>
-                      <Input id="delivery_contact_name" name="delivery_contact_name" value={formData.delivery_contact_name} onChange={handleChange} placeholder="Nom du contact" className="glass-input" />
+                      <Input
+                        id="delivery_contact_name"
+                        name="delivery_contact_name"
+                        value={formData.delivery_contact_name}
+                        onChange={handleChange}
+                        placeholder="Nom du contact"
+                        className="glass-input"
+                      />
                     </div>
 
                     <div className="grid grid-cols-2 gap-2">
                       <div className="space-y-2">
                         <Label htmlFor="delivery_contact_phone">Téléphone</Label>
-                        <Input id="delivery_contact_phone" name="delivery_contact_phone" value={formData.delivery_contact_phone} onChange={handleChange} placeholder="06 12 34 56 78" className="glass-input" />
+                        <Input
+                          id="delivery_contact_phone"
+                          name="delivery_contact_phone"
+                          value={formData.delivery_contact_phone}
+                          onChange={handleChange}
+                          placeholder="06 12 34 56 78"
+                          className="glass-input"
+                        />
                       </div>
                       <div className="space-y-2">
                         <Label htmlFor="delivery_contact_email">Email</Label>
-                        <Input id="delivery_contact_email" name="delivery_contact_email" value={formData.delivery_contact_email} onChange={handleChange} placeholder="contact@email.com" type="email" className="glass-input" />
+                        <Input
+                          id="delivery_contact_email"
+                          name="delivery_contact_email"
+                          value={formData.delivery_contact_email}
+                          onChange={handleChange}
+                          placeholder="contact@email.com"
+                          type="email"
+                          className="glass-input"
+                        />
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-3">
+                    <div className="grid grid-cols-2 gap-2">
                       <div className="space-y-2">
                         <Label htmlFor="delivery_date">Date d'arrivée</Label>
-                        <Input id="delivery_date" name="delivery_date" value={formData.delivery_date} onChange={handleChange} type="date" className="glass-input" />
+                        <Input
+                          id="delivery_date"
+                          name="delivery_date"
+                          value={formData.delivery_date}
+                          onChange={handleChange}
+                          type="date"
+                          className="glass-input"
+                        />
                       </div>
                       <div className="space-y-2">
                         <Label htmlFor="delivery_time">Heure d'arrivée</Label>
-                        <Input id="delivery_time" name="delivery_time" value={formData.delivery_time} onChange={handleChange} type="time" className="glass-input" />
+                        <Input
+                          id="delivery_time"
+                          name="delivery_time"
+                          value={formData.delivery_time}
+                          onChange={handleChange}
+                          type="time"
+                          className="glass-input"
+                        />
                       </div>
                     </div>
                   </div>
                 </div>
               </div>
-              )}
 
               {/* Informations opérationnelles */}
-              {wizardStep === 3 && (
               <div className="space-y-6">
                 <div className="flex items-center gap-3">
                   <div className="p-2 bg-gradient-royal rounded-lg">
@@ -532,70 +551,106 @@ const NewMission = () => {
                    )}
                  </div>
                </div>
-              )}
 
-              {/* Étape État des lieux retirée */}
+               {/* Section Revenus */}
+               <div className="space-y-6">
+                 <div className="flex items-center gap-3">
+                   <div className="p-2 bg-gradient-sunset rounded-lg">
+                     <div className="w-5 h-5 text-white">💰</div>
+                   </div>
+                   <h3 className="text-xl font-semibold bg-gradient-to-r from-white to-yellow-200 bg-clip-text text-transparent">
+                     💰 Configuration des revenus
+                   </h3>
+                 </div>
 
-              {/* Revenus retirés du formulaire principal */}
+                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                   <div className="space-y-4 p-4 glass-card rounded-lg border-white/10">
+                     <h4 className="font-semibold text-green-200 flex items-center gap-2">
+                       <div className="w-3 h-3 bg-green-400 rounded-full"></div>
+                       Revenus donneur d'ordre
+                     </h4>
+                     
+                     <div className="space-y-2">
+                        <Label htmlFor="donor_earning">Montant gagné (€) *</Label>
+                        <Input
+                          id="donor_earning"
+                          name="donor_earning"
+                          value={formData.donor_earning}
+                         onChange={handleChange}
+                         placeholder="Ex: 150.00"
+                         type="number"
+                         step="0.01"
+                         min="0"
+                         required
+                         className="glass-input"
+                       />
+                       <p className="text-xs text-muted-foreground">
+                         Montant que vous percevrez pour cette mission
+                       </p>
+                     </div>
+                   </div>
 
-              {/* Étape 4: Récapitulatif + Export PDF */}
-              {wizardStep === 4 && (
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <h3 className="text-xl font-semibold">Récapitulatif</h3>
-                    <Button type="button" onClick={handleDownloadPdf} className="bg-gradient-to-r from-indigo-600 to-fuchsia-600 text-white">
-                      <Download className="w-4 h-4 mr-2" /> Télécharger le PDF
-                    </Button>
-                  </div>
-                  <div className="bg-white rounded-xl">
-                    <MissionRecap data={formData as any} innerRef={recapRef} />
-                  </div>
+                   <div className="space-y-4 p-4 glass-card rounded-lg border-white/10">
+                     <h4 className="font-semibold text-blue-200 flex items-center gap-2">
+                       <div className="w-3 h-3 bg-blue-400 rounded-full"></div>
+                       Revenus convoyeur
+                     </h4>
+                     
+                     <div className="space-y-2">
+                        <Label htmlFor="driver_earning">Montant gagné (€) *</Label>
+                        <Input
+                          id="driver_earning"
+                          name="driver_earning"
+                          value={formData.driver_earning}
+                         onChange={handleChange}
+                         placeholder="Ex: 200.00"
+                         type="number"
+                         step="0.01"
+                         min="0"
+                         required
+                         className="glass-input"
+                       />
+                       <p className="text-xs text-muted-foreground">
+                         {formData.assigned_to === 'self' 
+                           ? 'Montant que vous percevrez en tant que convoyeur'
+                           : 'Montant que percevra le convoyeur assigné'
+                         }
+                       </p>
+                     </div>
+                   </div>
+                 </div>
 
-                  {/* Confirmation coût de création */}
-                  <div className="p-4 rounded-lg border border-yellow-400/30 bg-yellow-500/10 text-yellow-100">
-                    <div className="flex items-start gap-3">
-                      <div className="mt-0.5">💳</div>
-                      <div className="space-y-1">
-                        <div className="font-semibold">Confirmation de création</div>
-                        <div className="text-sm opacity-90">La création de cette mission coûte 1 crédit. Confirmez pour continuer.</div>
-                        <label className="flex items-center gap-2 mt-2">
-                          <Checkbox id="confirmCredit" checked={confirmCredit} onCheckedChange={(v) => setConfirmCredit(!!v)} />
-                          <span className="text-sm">J'accepte la consommation de 1 crédit pour créer cette mission.</span>
-                        </label>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
+                 <div className="p-4 glass-card rounded-lg border-yellow-400/20 bg-yellow-400/5">
+                   <p className="text-sm text-yellow-200 flex items-center gap-2">
+                     <span className="inline-flex w-4 h-4 text-yellow-400" aria-hidden>ℹ️</span>
+                     Ces informations financières restent confidentielles entre le donneur d'ordre et le convoyeur.
+                   </p>
+                 </div>
+               </div>
 
-              <div className="flex justify-between gap-4 pt-8 border-t border-white/10">
-                <div className="flex gap-2">
-                  <Button type="button" variant="outline" asChild className="glass-card text-foreground border-border hover:bg-accent/10">
-                    <Link to="/missions">
-                      <ArrowLeft className="w-4 h-4 mr-2" />
-                      Annuler
-                    </Link>
-                  </Button>
-                </div>
-                <div className="flex gap-2">
-                  {wizardStep > 1 && (
-                    <Button type="button" variant="outline" onClick={prevStep}>Étape précédente</Button>
-                  )}
-                  {wizardStep < steps.length ? (
-                    <Button type="button" className="bg-gradient-cosmic" onClick={nextStep}>Étape suivante</Button>
-                  ) : (
-                    <Button 
-                      type="submit" 
-                      disabled={createMission.isPending || !formData.title || !formData.vehicle_type || !confirmCredit}
-                      className="bg-gradient-cosmic hover:scale-105 transition-all duration-300 glow-hover"
-                    >
-                      <Plus className="w-4 h-4 mr-2" />
-                      {createMission.isPending ? 'Création en cours...' : 'Créer la mission'}
-                    </Button>
-                  )}
-                </div>
+              <div className="flex justify-end gap-4 pt-8 border-t border-white/10">
+                <Button type="button" variant="outline" asChild className="glass-card text-foreground border-border hover:bg-accent/10">
+                  <Link to="/missions">
+                    <ArrowLeft className="w-4 h-4 mr-2" />
+                    Annuler
+                  </Link>
+                </Button>
+                <Button 
+                  type="submit" 
+                  disabled={createMission.isPending || !formData.title || !formData.vehicle_type || !formData.donor_earning || !formData.driver_earning}
+                  className="bg-gradient-cosmic hover:scale-105 transition-all duration-300 glow-hover"
+                >
+                  <Plus className="w-4 h-4 mr-2" />
+                  {createMission.isPending ? 'Création en cours...' : 'Créer la mission premium'}
+                </Button>
               </div>
             </form>
+            <VehicleImagePicker
+              open={imagePickerOpen}
+              onClose={() => setImagePickerOpen(false)}
+              onSelect={(path) => setFormData(prev => ({ ...prev, vehicle_image_path: path }))}
+              prefix="catalog"
+            />
           </CardContent>
         </Card>
       </div>

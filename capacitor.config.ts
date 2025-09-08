@@ -2,7 +2,7 @@ import { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
   appId: 'app.lovable.2ef1e4e81315408abdf7f0957274267f',
-  appName: 'FleetCheck',
+  appName: 'FleetCheecks',
   webDir: 'dist',
   server: {
     url: 'https://2ef1e4e8-1315-408a-bdf7-f0957274267f.lovableproject.com?forceHideBadge=true',

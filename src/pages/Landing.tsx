@@ -17,9 +17,6 @@ import {
   Smartphone,
   Monitor
 } from "lucide-react";
-import { BRAND_LOGO_LOCAL, BRAND_NAME, withLogoFallback } from "@/lib/branding";
-// Logo local avec fallback distant
-const userLogoUrl = BRAND_LOGO_LOCAL;
 import mobileAppMockup from "@/assets/mobile-app-mockup.jpg";
 import webAppMockup from "@/assets/web-app-mockup.jpg";
 
@@ -61,7 +58,7 @@ const plans = [
     name: "Découverte",
     price: "Gratuit",
     credits: 5,
-  description: "Parfait pour tester FleetChecks",
+  description: "Parfait pour tester FleetCheecks",
     features: [
       "5 crédits offerts",
       "Toutes les fonctionnalités",
@@ -151,13 +148,10 @@ export default function Landing() {
     <div className="min-h-screen bg-background">
       {/* Header */}
       <header className="border-b bg-card/50 backdrop-blur-sm sticky top-0 z-50">
-        <div className="container mx-auto px-4 py-3 flex justify-between items-center">
+        <div className="container mx-auto px-4 py-4 flex justify-between items-center">
           <div className="flex items-center gap-3">
-            <span
-              className="text-xl md:text-2xl font-extrabold tracking-tight bg-clip-text text-transparent"
-              style={{ backgroundImage: "linear-gradient(90deg, #20e3b2 0%, #0ea5e9 100%)" }}
-            >
-              {BRAND_NAME}
+            <span className="font-extrabold tracking-tight text-[#00c8ff] text-2xl sm:text-3xl md:text-4xl select-none">
+              FleetCheecks
             </span>
           </div>
           <div className="flex gap-3">
@@ -177,11 +171,6 @@ export default function Landing() {
           <Badge variant="secondary" className="mb-6">
             Nouvelle génération de convoyage
           </Badge>
-          <div className="relative mx-auto w-fit">
-            <div className="absolute inset-0 rounded-3xl bg-primary/10 blur-xl scale-105" aria-hidden />
-            <img src={userLogoUrl} onError={(e) => withLogoFallback(e)} alt={BRAND_NAME} className="relative block mb-2 h-40 md:h-56 w-auto object-contain rounded-3xl ring-1 ring-primary/10 shadow-lg shadow-primary/20" />
-          </div>
-          <div className="text-primary font-extrabold text-2xl md:text-3xl mb-8">FleetChecks</div>
           <h1 className="text-5xl font-bold mb-6 text-foreground">
             Simplifiez votre <span className="text-primary">convoyage</span> et vos <span className="text-primary">inspections</span>
           </h1>
@@ -213,7 +202,7 @@ export default function Landing() {
               Disponible partout, à tout moment
             </h2>
             <p className="text-xl text-muted-foreground">
-              FleetChecks s'adapte à votre façon de travailler : sur mobile ou ordinateur
+              FleetCheecks s'adapte à votre façon de travailler : sur mobile ou ordinateur
             </p>
           </div>
           
@@ -233,7 +222,7 @@ export default function Landing() {
               <div className="relative mx-auto max-w-sm">
                 <img 
                   src={mobileAppMockup} 
-                  alt="FleetChecks App Mobile" 
+                  alt="FleetCheecks App Mobile" 
                   className="w-full h-auto rounded-2xl shadow-2xl"
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-background/20 to-transparent rounded-2xl"></div>
@@ -270,7 +259,7 @@ export default function Landing() {
               <div className="relative">
                 <img 
                   src={webAppMockup} 
-                  alt="FleetChecks Dashboard Web" 
+                  alt="FleetCheecks Dashboard Web" 
                   className="w-full h-auto rounded-xl shadow-2xl"
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-background/20 to-transparent rounded-xl"></div>
@@ -417,7 +406,7 @@ export default function Landing() {
             Prêt à simplifier votre convoyage ?
           </h2>
           <p className="text-xl text-muted-foreground mb-8">
-            Rejoignez les professionnels qui font confiance à FleetChecks pour gérer leurs missions de convoyage.
+            Rejoignez les professionnels qui font confiance à FleetCheecks pour gérer leurs missions de convoyage.
           </p>
           <Button size="lg" asChild>
             <Link to="/login">
@@ -446,17 +435,17 @@ export default function Landing() {
       <footer className="border-t bg-card/50 py-12 px-4">
         <div className="container mx-auto text-center">
           <div className="flex items-center justify-center gap-3 mb-4">
-            <div className="relative">
-              <div className="absolute inset-0 rounded-2xl bg-primary/10 blur-lg scale-105" aria-hidden />
-              <img src={userLogoUrl} onError={(e) => withLogoFallback(e)} alt={BRAND_NAME} className="relative h-14 md:h-16 w-auto object-cover rounded-2xl ring-1 ring-primary/10 shadow-md shadow-primary/20" style={{ transform: 'scaleX(1.15)' }} />
-            </div>
+            <span className="font-extrabold tracking-tight text-[#00c8ff] text-xl select-none">FleetCheecks</span>
           </div>
           <p className="text-muted-foreground mb-4">
             La solution moderne pour le convoyage professionnel
           </p>
-          <p className="text-sm text-muted-foreground">
-            © 2024 FleetChecks. Tous droits réservés.
-          </p>
+          <div className="flex flex-col items-center gap-1 text-sm text-muted-foreground">
+            <p>© 2024 FleetCheecks. Tous droits réservés.</p>
+            <p>
+              Version {typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : 'dev'} · Build {typeof __BUILD_TIME__ !== 'undefined' ? new Date(__BUILD_TIME__).toLocaleString() : 'dev'}
+            </p>
+          </div>
         </div>
       </footer>
     </div>

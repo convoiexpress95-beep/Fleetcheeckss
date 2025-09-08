@@ -23,7 +23,7 @@ self.addEventListener('push', (event) => {
     } catch (error) {
       console.error('Error parsing push data:', error);
       data = {
-        title: 'FleetCheck',
+        title: 'FleetCheecks',
         body: 'Vous avez une nouvelle notification',
         icon: '/icon-192x192.png',
       };
@@ -44,12 +44,12 @@ self.addEventListener('push', (event) => {
     ],
     requireInteraction: true,
     silent: false,
-    tag: data.tag || 'fleetcheck-notification',
+  tag: data.tag || 'fleetcheecks-notification',
     renotify: true,
   };
 
   event.waitUntil(
-    self.registration.showNotification(data.title || 'FleetCheck', options)
+  self.registration.showNotification(data.title || 'FleetCheecks', options)
   );
 });
 

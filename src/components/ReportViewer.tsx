@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -7,6 +7,8 @@ import { Download, FileText, Calendar, TrendingUp, BarChart3 } from 'lucide-reac
 import { Report } from '@/hooks/useReports';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
+import { getPublicUrlForMissionPhoto, normalizePhotoList } from '@/integrations/supabase/storage';
+import { supabase } from '@/integrations/supabase/client';
 
 interface ReportViewerProps {
   report: Report | null;
@@ -85,6 +87,79 @@ const ReportViewer: React.FC<ReportViewerProps> = ({ report, open, onOpenChange 
     }
   };
 
+  const getStatusLabel = (status: string) => {
+    switch (status) {
+      case 'available': return 'Disponible';
+      case 'generated': return 'Généré';
+      case 'processing': return 'En cours';
+      default: return status;
+    }
+  };
+
+  // Extraction éventuelle des données d'inspections depuis le metadata
+  const inspections = (report.metadata && typeof report.metadata === 'object') ? (report.metadata as any) : {};
+  const [fallbackDeparture, setFallbackDeparture] = useState<any | null>(null);
+  const [fallbackArrival, setFallbackArrival] = useState<any | null>(null);
+  const [loadingFallback, setLoadingFallback] = useState(false);
+
+  // Tentative d'extraction de mission_id depuis le metadata
+  const missionIdFromMetadata = useMemo(() => {
+    const m = inspections?.mission_id
+      || inspections?.mission?.id
+      || inspections?.missions?.[0]?.id
+      || inspections?.summary?.mission_id
+      || inspections?.summary?.missions?.[0]?.id
+      || inspections?.latest_mission?.id
+      || null;
+    return typeof m === 'string' ? m : null;
+  }, [inspections]);
+
+  const departure = inspections.departure || inspections.inspection_departure || fallbackDeparture || null;
+  const arrival = inspections.arrival || inspections.inspection_arrival || fallbackArrival || null;
+
+  useEffect(() => {
+    const needDep = !inspections.departure && !inspections.inspection_departure;
+    const needArr = !inspections.arrival && !inspections.inspection_arrival;
+    if (!missionIdFromMetadata || (!needDep && !needArr)) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        setLoadingFallback(true);
+        if (needDep) {
+          const { data: depRow } = await supabase
+            .from('inspection_departures')
+            .select('*')
+            .eq('mission_id', missionIdFromMetadata)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+          if (!cancelled && depRow) setFallbackDeparture(depRow);
+        }
+        if (needArr) {
+          const { data: arrRow } = await supabase
+            .from('inspection_arrivals')
+            .select('*')
+            .eq('mission_id', missionIdFromMetadata)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+          if (!cancelled && arrRow) setFallbackArrival(arrRow);
+        }
+      } finally {
+        if (!cancelled) setLoadingFallback(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [missionIdFromMetadata, inspections.departure, inspections.inspection_departure, inspections.arrival, inspections.inspection_arrival]);
+
+  // Helper pour mapper une liste de clés Storage vers des URLs publiques
+  const mapToPublicUrls = (list: any): string[] => normalizePhotoList(list).map(getPublicUrlForMissionPhoto).filter(Boolean) as string[];
+
+  const depPhotoUrls = mapToPublicUrls(departure?.photos);
+  const arrPhotoUrls = mapToPublicUrls(arrival?.photos);
+  const depSignatureUrl = getPublicUrlForMissionPhoto(departure?.client_signature_url);
+  const arrSignatureUrl = getPublicUrlForMissionPhoto(arrival?.client_signature_url);
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto glass-card border-white/20">
@@ -95,7 +170,7 @@ const ReportViewer: React.FC<ReportViewerProps> = ({ report, open, onOpenChange 
           </DialogTitle>
           <DialogDescription className="text-foreground/80 flex items-center gap-4">
             <Badge className={`${getStatusColor(report.status)} text-white border-0`}>
-              {report.status}
+              {getStatusLabel(report.status)}
             </Badge>
             <span>{getReportTypeLabel(report.report_type)}</span>
             <span>•</span>
@@ -237,11 +312,65 @@ const ReportViewer: React.FC<ReportViewerProps> = ({ report, open, onOpenChange 
             </Card>
           )}
 
-          {/* Metadata */}
+          {/* Photos & Signatures d'inspection */}
+          {(depPhotoUrls.length > 0 || arrPhotoUrls.length > 0 || depSignatureUrl || arrSignatureUrl) && (
+            <Card className="glass-card border-white/10">
+              <CardHeader>
+                <CardTitle className="text-white">Preuves d'inspection</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                {loadingFallback && (
+                  <div className="text-sm text-muted-foreground">Chargement des preuves...</div>
+                )}
+                {depPhotoUrls.length > 0 && (
+                  <div>
+                    <h4 className="font-semibold text-white mb-2">Photos Départ</h4>
+                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                      {depPhotoUrls.map((url, idx) => (
+                        <a key={idx} href={url} target="_blank" rel="noreferrer" className="block">
+                          <img src={url} alt={`Photo départ ${idx + 1}`} className="w-full h-32 object-cover rounded-lg border border-white/10" />
+                        </a>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {depSignatureUrl && (
+                  <div>
+                    <h4 className="font-semibold text-white mb-2">Signature client (Départ)</h4>
+                    <div className="bg-white p-3 rounded-md inline-block">
+                      <img src={depSignatureUrl} alt="Signature client départ" className="max-h-40" />
+                    </div>
+                  </div>
+                )}
+                {arrPhotoUrls.length > 0 && (
+                  <div>
+                    <h4 className="font-semibold text-white mb-2">Photos Arrivée</h4>
+                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                      {arrPhotoUrls.map((url, idx) => (
+                        <a key={idx} href={url} target="_blank" rel="noreferrer" className="block">
+                          <img src={url} alt={`Photo arrivée ${idx + 1}`} className="w-full h-32 object-cover rounded-lg border border-white/10" />
+                        </a>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {arrSignatureUrl && (
+                  <div>
+                    <h4 className="font-semibold text-white mb-2">Signature client (Arrivée)</h4>
+                    <div className="bg-white p-3 rounded-md inline-block">
+                      <img src={arrSignatureUrl} alt="Signature client arrivée" className="max-h-40" />
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Metadata brut (debug) */}
           {report.metadata && (
             <Card className="glass-card border-white/10">
               <CardHeader>
-                <CardTitle className="text-white">Informations additionnelles</CardTitle>
+                <CardTitle className="text-white">Informations additionnelles (brut)</CardTitle>
               </CardHeader>
               <CardContent>
                 <pre className="text-muted-foreground text-sm overflow-x-auto">

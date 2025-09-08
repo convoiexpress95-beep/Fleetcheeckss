@@ -9,9 +9,11 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Euro, TrendingUp, PieChart, Calendar, Download, Plus, CreditCard, Receipt, Building, Users, FileText, Settings, Search, CheckCircle, AlertCircle, Eye } from 'lucide-react';
-import { useBilling, type CompanyInfo, type Invoice } from '@/hooks/useBilling';
+import { useBilling, type CompanyInfo, type Invoice, type Quote } from '@/hooks/useBilling';
+import { CreateQuoteDialog } from '@/components/CreateQuoteDialog';
 import { CreateInvoiceDialog } from '@/components/CreateInvoiceDialog';
 import { InvoicePreview } from '@/components/InvoicePreview';
+import { QuotePreview } from '@/components/QuotePreview';
 import { toast } from '@/hooks/use-toast';
 
 const Billing = () => {
@@ -19,11 +21,15 @@ const Billing = () => {
     loading, 
     companyInfo, 
     clients, 
-    invoices, 
+    invoices,
+    quotes,
     saveCompanyInfo, 
     validateSiret, 
     updateInvoiceStatus,
-    loadInvoices
+  updateQuoteStatus,
+  convertQuoteToInvoice,
+    loadInvoices,
+    loadQuotes
   } = useBilling();
   
   const [companyDialogOpen, setCompanyDialogOpen] = useState(false);
@@ -37,6 +43,8 @@ const Billing = () => {
   const [siretSearch, setSiretSearch] = useState('');
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
   const [previewMode, setPreviewMode] = useState(false);
+  const [selectedQuote, setSelectedQuote] = useState<Quote | null>(null);
+  const [quotePreviewMode, setQuotePreviewMode] = useState(false);
 
   // Charger les informations de l'entreprise au démarrage
   useEffect(() => {
@@ -103,6 +111,23 @@ const Billing = () => {
       cancelled: { label: 'Annulée', color: 'bg-red-500' }
     };
     
+    const config = statusConfig[status] || statusConfig.draft;
+    return (
+      <Badge className={`${config.color} text-white border-0`}>
+        {config.label}
+      </Badge>
+    );
+  };
+
+  const getQuoteStatusBadge = (status: Quote['status']) => {
+    const statusConfig: Record<Quote['status'], { label: string; color: string }> = {
+      draft: { label: 'Brouillon', color: 'bg-gray-500' },
+      sent: { label: 'Envoyé', color: 'bg-gradient-cosmic' },
+      accepted: { label: 'Accepté', color: 'bg-gradient-ocean' },
+      rejected: { label: 'Refusé', color: 'bg-red-500' },
+      expired: { label: 'Expiré', color: 'bg-gradient-sunset' },
+      cancelled: { label: 'Annulé', color: 'bg-red-500' },
+    };
     const config = statusConfig[status] || statusConfig.draft;
     return (
       <Badge className={`${config.color} text-white border-0`}>
@@ -434,10 +459,14 @@ const Billing = () => {
 
         {/* Main Content */}
         <Tabs defaultValue="invoices" className="animate-fade-in">
-          <TabsList className="grid w-full grid-cols-3 glass-card border-white/10 mb-8">
+          <TabsList className="grid w-full grid-cols-4 glass-card border-white/10 mb-8">
             <TabsTrigger value="invoices" className="data-[state=active]:bg-gradient-cosmic data-[state=active]:text-white">
               <Receipt className="w-4 h-4 mr-2" />
               Factures légales ({stats.totalInvoices})
+            </TabsTrigger>
+            <TabsTrigger value="quotes" className="data-[state=active]:bg-gradient-ocean data-[state=active]:text-white">
+              <FileText className="w-4 h-4 mr-2" />
+              Devis
             </TabsTrigger>
             <TabsTrigger value="clients" className="data-[state=active]:bg-gradient-ocean data-[state=active]:text-white">
               <Users className="w-4 h-4 mr-2" />
@@ -462,9 +491,10 @@ const Billing = () => {
                       Numérotation séquentielle automatique • Conformité légale française • Validation INSEE
                     </CardDescription>
                   </div>
-                  <CreateInvoiceDialog 
-                    onInvoiceCreated={() => loadInvoices()}
-                  />
+                  <div className="flex gap-2">
+                    <CreateInvoiceDialog onInvoiceCreated={() => loadInvoices()} />
+                    <CreateQuoteDialog onQuoteCreated={() => loadQuotes()} />
+                  </div>
                 </div>
               </CardHeader>
             </Card>
@@ -662,6 +692,114 @@ const Billing = () => {
               </CardContent>
             </Card>
           </TabsContent>
+
+          <TabsContent value="quotes" className="space-y-6">
+            <Card className="glass-card border-white/10">
+              <CardHeader>
+                <div className="flex justify-between items-center">
+                  <div>
+                    <CardTitle className="text-xl bg-gradient-to-r from-white to-blue-200 bg-clip-text text-transparent">
+                      Gestion des Devis
+                    </CardTitle>
+                    <CardDescription className="text-muted-foreground">
+                      Numérotation séquentielle automatique • Validité du devis • Mentions légales
+                    </CardDescription>
+                  </div>
+                  <CreateQuoteDialog onQuoteCreated={() => loadQuotes()} />
+                </div>
+              </CardHeader>
+            </Card>
+
+            <div className="space-y-4">
+              {quotes.length === 0 ? (
+                <Card className="glass-card border-white/10">
+                  <CardContent className="p-12 text-center">
+                    <FileText className="w-16 h-16 text-muted-foreground/30 mx-auto mb-4" />
+                    <h3 className="text-xl text-muted-foreground mb-2">Aucun devis créé</h3>
+                    <p className="text-muted-foreground/50 mb-6">
+                      Créez votre premier devis légal avec validité et numérotation automatique
+                    </p>
+                    <CreateQuoteDialog onQuoteCreated={() => loadQuotes()} />
+                  </CardContent>
+                </Card>
+              ) : (
+                quotes.map((quote) => (
+                  <Card key={quote.id} className="glass-card border-white/10 hover:scale-[1.02] transition-all duration-500">
+                    <CardContent className="p-6">
+                      <div className="flex justify-between items-center">
+                        <div className="flex items-center gap-4">
+                          <div className="p-3 bg-gradient-ocean rounded-lg">
+                            <FileText className="w-5 h-5 text-white" />
+                          </div>
+                          <div>
+                            <h3 className="font-semibold text-white text-lg">{quote.quote_number}</h3>
+                            <p className="text-muted-foreground">
+                              {quote.client?.is_company ? quote.client.company_name : `${quote.client?.first_name} ${quote.client?.last_name}`}
+                            </p>
+                            <p className="text-sm text-muted-foreground">
+                              Émis le {new Date(quote.quote_date).toLocaleDateString('fr-FR')} • Valable jusqu'au {new Date(quote.validity_date).toLocaleDateString('fr-FR')}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-4">
+                          <div className="text-right">
+                            <p className="text-2xl font-bold bg-gradient-to-r from-white to-green-200 bg-clip-text text-transparent">
+                              {new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(quote.total_ttc)}
+                            </p>
+                            <p className="text-sm text-muted-foreground">
+                              HT: {new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(quote.subtotal_ht)} • TVA: {new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(quote.vat_amount)}
+                            </p>
+                          </div>
+                          {getQuoteStatusBadge(quote.status)}
+                          <div className="flex gap-2">
+                            <Button 
+                              size="sm" 
+                              variant="outline" 
+                              className="glass-card text-foreground border-border hover:bg-accent/10"
+                              onClick={() => { setSelectedQuote(quote); setQuotePreviewMode(true); }}
+                            >
+                              <Eye className="w-4 h-4" />
+                            </Button>
+                            {quote.status === 'accepted' && (
+                              <Button
+                                size="sm"
+                                className="bg-gradient-cosmic"
+                                onClick={async () => {
+                                  const inv = await convertQuoteToInvoice(quote.id!);
+                                  if (inv && companyInfo) {
+                                    setSelectedInvoice(inv as Invoice);
+                                    setPreviewMode(true);
+                                  }
+                                }}
+                              >
+                                Convertir en facture
+                              </Button>
+                            )}
+                            <Select
+                              value={quote.status}
+                              onValueChange={(value: Quote['status']) => updateQuoteStatus(quote.id!, value)}
+                            >
+                              <SelectTrigger className="w-40 glass-card border-white/20 bg-white/5 text-white">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent className="glass-card border-white/20">
+                                <SelectItem value="draft">Brouillon</SelectItem>
+                                <SelectItem value="sent">Envoyé</SelectItem>
+                                <SelectItem value="accepted">Accepté</SelectItem>
+                                <SelectItem value="rejected">Refusé</SelectItem>
+                                <SelectItem value="expired">Expiré</SelectItem>
+                                <SelectItem value="cancelled">Annulé</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))
+              )}
+            </div>
+          </TabsContent>
         </Tabs>
       </div>
 
@@ -676,6 +814,23 @@ const Billing = () => {
               onClose={() => {
                 setPreviewMode(false);
                 setSelectedInvoice(null);
+              }}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Quote Preview Modal */}
+      {quotePreviewMode && selectedQuote && companyInfo && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 overflow-auto">
+          <div className="container mx-auto px-4 py-8">
+            <QuotePreview
+              quote={selectedQuote}
+              companyInfo={companyInfo}
+              isPreview={true}
+              onClose={() => {
+                setQuotePreviewMode(false);
+                setSelectedQuote(null);
               }}
             />
           </div>

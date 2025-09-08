@@ -1,0 +1,11 @@
+name: (disabled) Vercel deploy (use Vercel integration)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  noop:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Notice
+  run: echo 'Deprecated: deployment is handled by Vercel project integration. This workflow remains only as a stub.'

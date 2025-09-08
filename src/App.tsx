@@ -17,15 +17,22 @@ import Contacts from "./pages/Contacts";
 import Tracking from "./pages/Tracking";
 import PublicTracking from "./pages/PublicTracking";
 import Reports from "./pages/Reports";
-import Marketplace from "./pages/Marketplace";
-import TrajetsPartages from "./pages/TrajetsPartages";
-import Messages from "./pages/Messages";
 import Billing from "./pages/Billing";
 import Shop from "./pages/Shop";
+import Marketplace from "./pages/Marketplace";
+import PostMarketplaceMission from "./pages/PostMarketplaceMission";
+import AcceptedMarketplaceMissions from "./pages/AcceptedMarketplaceMissions";
 import Settings from "./pages/Settings";
 import Admin from "./pages/Admin";
+import Catalog from "./pages/Catalog";
 import NotFound from "./pages/NotFound";
-import Profile from "./pages/Profile";
+import ConvoiturageHome from "./pages/convoiturage/Index";
+import ConvoituragePublish from "./pages/convoiturage/PublishTrip";
+import ConvoiturageTripDetails from "./pages/convoiturage/TripDetails";
+import ConvoiturageMyTrips from "./pages/convoiturage/MyTrips";
+import ConvoiturageMessages from "./pages/convoiturage/Messages";
+import ConvoiturageProfile from "./pages/convoiturage/Profile";
+import ConvoiturageLayout from "./pages/convoiturage/Layout";
 
 const queryClient = new QueryClient();
 
@@ -46,34 +53,6 @@ const App = () => (
               <ProtectedRoute>
                 <DashboardLayout>
                   <Dashboard />
-                </DashboardLayout>
-              </ProtectedRoute>
-            } />
-            <Route path="/profile/:id" element={
-              <ProtectedRoute>
-                <DashboardLayout>
-                  <Profile />
-                </DashboardLayout>
-              </ProtectedRoute>
-            } />
-            <Route path="/marketplace" element={
-              <ProtectedRoute>
-                <DashboardLayout>
-                  <Marketplace />
-                </DashboardLayout>
-              </ProtectedRoute>
-            } />
-            <Route path="/messages" element={
-              <ProtectedRoute>
-                <DashboardLayout>
-                  <Messages />
-                </DashboardLayout>
-              </ProtectedRoute>
-            } />
-            <Route path="/trajets" element={
-              <ProtectedRoute>
-                <DashboardLayout>
-                  <TrajetsPartages />
                 </DashboardLayout>
               </ProtectedRoute>
             } />
@@ -126,10 +105,85 @@ const App = () => (
                 </DashboardLayout>
               </ProtectedRoute>
             } />
+            <Route path="/convoiturage" element={
+              <ProtectedRoute>
+                <DashboardLayout>
+                  <ConvoiturageLayout>
+                    <ConvoiturageHome />
+                  </ConvoiturageLayout>
+                </DashboardLayout>
+              </ProtectedRoute>
+            } />
+            <Route path="/convoiturage/publish" element={
+              <ProtectedRoute>
+                <DashboardLayout>
+                  <ConvoiturageLayout>
+                    <ConvoituragePublish />
+                  </ConvoiturageLayout>
+                </DashboardLayout>
+              </ProtectedRoute>
+            } />
+            <Route path="/convoiturage/trips/:id" element={
+              <ProtectedRoute>
+                <DashboardLayout>
+                  <ConvoiturageLayout>
+                    <ConvoiturageTripDetails />
+                  </ConvoiturageLayout>
+                </DashboardLayout>
+              </ProtectedRoute>
+            } />
+            <Route path="/convoiturage/my-trips" element={
+              <ProtectedRoute>
+                <DashboardLayout>
+                  <ConvoiturageLayout>
+                    <ConvoiturageMyTrips />
+                  </ConvoiturageLayout>
+                </DashboardLayout>
+              </ProtectedRoute>
+            } />
+            <Route path="/convoiturage/messages" element={
+              <ProtectedRoute>
+                <DashboardLayout>
+                  <ConvoiturageLayout>
+                    <ConvoiturageMessages />
+                  </ConvoiturageLayout>
+                </DashboardLayout>
+              </ProtectedRoute>
+            } />
+            <Route path="/convoiturage/profile" element={
+              <ProtectedRoute>
+                <DashboardLayout>
+                  <ConvoiturageLayout>
+                    <ConvoiturageProfile />
+                  </ConvoiturageLayout>
+                </DashboardLayout>
+              </ProtectedRoute>
+            } />
             <Route path="/shop" element={
               <ProtectedRoute>
                 <DashboardLayout>
                   <Shop />
+                </DashboardLayout>
+              </ProtectedRoute>
+            } />
+            <Route path="/marketplace" element={
+              <ProtectedRoute>
+                <DashboardLayout>
+                  <Marketplace />
+                </DashboardLayout>
+              </ProtectedRoute>
+            } />
+            <Route path="/marketplace/post" element={
+              <ProtectedRoute>
+                <DashboardLayout>
+                  <PostMarketplaceMission />
+                </DashboardLayout>
+              </ProtectedRoute>
+            } />
+            <Route path="/marketplace/accepted" element={
+              <ProtectedRoute>
+                <DashboardLayout>
+                  <AcceptedMarketplaceMissions />
                 </DashboardLayout>
               </ProtectedRoute>
             } />
@@ -144,6 +198,13 @@ const App = () => (
               <ProtectedRoute>
                 <DashboardLayout>
                   <Admin />
+                </DashboardLayout>
+              </ProtectedRoute>
+            } />
+            <Route path="/catalog" element={
+              <ProtectedRoute>
+                <DashboardLayout>
+                  <Catalog />
                 </DashboardLayout>
               </ProtectedRoute>
             } />

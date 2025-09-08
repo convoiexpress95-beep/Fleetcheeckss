@@ -6,11 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Sparkles, Lock, Mail, User, ArrowLeft } from 'lucide-react';
-
-import { BRAND_LOGO_LOCAL, BRAND_NAME, withLogoFallback } from "@/lib/branding";
-// Logo local avec fallback distant
-const userLogoUrl = BRAND_LOGO_LOCAL;
+import { Truck, Sparkles, Lock, Mail, User, ArrowLeft } from 'lucide-react';
 
 const Login = () => {
   const { signIn, signUp, user } = useAuth();
@@ -66,18 +62,13 @@ const Login = () => {
       <div className="w-full max-w-md relative z-10 animate-fade-in-up">
         {/* Header */}
         <div className="text-center mb-8">
-          <div className="flex flex-col items-center justify-center mb-4 leading-none">
-            <img
-              src={userLogoUrl}
-              onError={(e) => withLogoFallback(e)}
-              alt="FleetChecks"
-              className="h-16 md:h-20 w-auto object-cover rounded-2xl ring-2 ring-primary/20"
-              style={{ transform: 'scaleX(1.1)' }}
-            />
-            <span className="mt-1 font-extrabold text-white text-base md:text-lg">FleetChecks</span>
+          <div className="mb-6">
+            <h1 className="text-3xl font-bold text-white tracking-tight">
+              FleetCheecks
+            </h1>
           </div>
           <p className="text-foreground/80 text-lg">
-            Connectez-vous à FleetChecks pour gérer vos inspections véhicules
+            Connectez-vous à FleetCheecks pour gérer vos inspections véhicules
           </p>
         </div>
 
@@ -87,7 +78,7 @@ const Login = () => {
               Bienvenue
             </CardTitle>
             <CardDescription className="text-muted-foreground">
-              Connectez-vous ou créez un compte pour accéder à FleetChecks
+              Connectez-vous ou créez un compte pour accéder à FleetCheecks
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -224,7 +215,7 @@ const Login = () => {
                     ) : (
                       <>
                         <Sparkles className="w-5 h-5 mr-2" />
-                        Créer mon compte FleetChecks
+                        Créer mon compte FleetCheecks
                       </>
                     )}
                   </Button>

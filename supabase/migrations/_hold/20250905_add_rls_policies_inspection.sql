@@ -1,4 +1,4 @@
--- RLS policies for inspection-related tables and missions updates
+-- archived placeholder-- RLS policies for inspection-related tables and missions updates
 -- Allows users who are involved in a mission (creator or driver) to read/insert/update related rows
 
 -- Missions

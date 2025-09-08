@@ -65,6 +65,7 @@ import {
   HardDrive,
   Wifi
 } from "lucide-react";
+import { VehicleModelsManager } from "@/components/VehicleModelsManager";
 
 interface RealTimeStats {
   totalUsers: number;
@@ -86,9 +87,7 @@ export default function Admin() {
     twoFactorAuth: false,
     smtpServer: '',
     smtpPort: 587,
-  senderEmail: 'noreply@fleetcheck.app',
-  emailNotifications: true,
-  smsNotifications: false,
+    senderEmail: 'noreply@fleetcheck.app'
   });
   
   const navigate = useNavigate();
@@ -102,45 +101,8 @@ export default function Admin() {
   
   const realMissions = missionsData?.data || [];
 
-  // Charger paramètres admin (Supabase avec fallback local) et statistiques
+  // Charger les statistiques en temps réel
   useEffect(() => {
-    const loadAdminSettings = async () => {
-      try {
-        // Tenter de charger depuis Supabase (caster car types non générés pour admin_settings)
-        const { data, error } = await (supabase as any)
-          .from('admin_settings')
-          .select('*')
-          .single();
-
-        if (!error && data) {
-          const row: any = data;
-          setAdminSettings(prev => ({
-            ...prev,
-            sessionDuration: row.session_duration ?? prev.sessionDuration,
-            maxLoginAttempts: row.max_login_attempts ?? prev.maxLoginAttempts,
-            twoFactorAuth: row.two_factor_auth ?? prev.twoFactorAuth,
-            smtpServer: row.smtp_server ?? prev.smtpServer,
-            smtpPort: row.smtp_port ?? prev.smtpPort,
-            senderEmail: row.sender_email ?? prev.senderEmail,
-            emailNotifications: row.email_notifications ?? prev.emailNotifications,
-            smsNotifications: row.sms_notifications ?? prev.smsNotifications,
-          }));
-          setNotifications(Boolean(row.notifications_enabled));
-          setMaintenance(Boolean(row.maintenance_enabled));
-        } else {
-          // Fallback localStorage si RLS bloque ou table absente
-          try {
-            const saved = localStorage.getItem('adminSettings');
-            if (saved) setAdminSettings(prev => ({ ...prev, ...JSON.parse(saved) }));
-            const savedNotif = localStorage.getItem('adminNotifications');
-            if (savedNotif) setNotifications(JSON.parse(savedNotif));
-            const savedMaint = localStorage.getItem('adminMaintenance');
-            if (savedMaint) setMaintenance(JSON.parse(savedMaint));
-          } catch {}
-        }
-      } catch {}
-    };
-
     const loadSystemStats = async () => {
       try {
         // Statistiques utilisateurs
@@ -182,31 +144,24 @@ export default function Admin() {
           variant: "destructive"
         });
       } finally {
-        // setLoading géré par bootstrap pour éviter les courses
+        setLoading(false);
       }
     };
 
-    const bootstrap = async () => {
-      await loadAdminSettings();
-      if (!usersLoading && !missionsLoading) {
-        await loadSystemStats();
-      }
-      setLoading(false);
-    };
-
-    bootstrap();
+    if (!usersLoading && !missionsLoading) {
+      loadSystemStats();
+    }
   }, [realUsers, realMissions, usersLoading, missionsLoading, toast]);
 
   // Fonctions d'administration
   const handleDeleteUser = async (userId: string) => {
     try {
-      // Soft delete: désactiver l'utilisateur dans la table profiles
-      const { error } = await supabase
-        .from('profiles')
-        .update({ status: 'inactive', updated_at: new Date().toISOString() })
-        .eq('id', userId);
-      if (error) throw error;
-      toast({ title: 'Utilisateur désactivé', description: 'Le compte a été marqué comme inactif.' });
+      // En production, cela devrait être une fonction sécurisée côté serveur
+      toast({
+        title: "Suppression sécurisée",
+        description: "Cette action nécessite une validation administrative supplémentaire",
+        variant: "destructive"
+      });
     } catch (error) {
       toast({
         title: "Erreur",
@@ -219,12 +174,7 @@ export default function Admin() {
   const handleSystemMaintenance = async (enable: boolean) => {
     try {
       setMaintenance(enable);
-      // Persiste en base (admin_settings)
-  await (supabase as any).from('admin_settings').upsert({
-        id: 1,
-        maintenance_enabled: enable,
-      });
-      localStorage.setItem('adminMaintenance', JSON.stringify(enable));
+      // Ici vous pourriez mettre à jour une table de configuration système
       toast({
         title: enable ? "Mode maintenance activé" : "Mode maintenance désactivé",
         description: enable ? 
@@ -243,21 +193,7 @@ export default function Admin() {
 
   const saveAdminSettings = async () => {
     try {
-      // Persistance Supabase (avec fallback local)
-  await (supabase as any).from('admin_settings').upsert({
-        id: 1,
-        session_duration: adminSettings.sessionDuration,
-        max_login_attempts: adminSettings.maxLoginAttempts,
-        two_factor_auth: adminSettings.twoFactorAuth,
-        smtp_server: adminSettings.smtpServer,
-        smtp_port: adminSettings.smtpPort,
-        sender_email: adminSettings.senderEmail,
-        notifications_enabled: notifications,
-        email_notifications: adminSettings.emailNotifications,
-        sms_notifications: adminSettings.smsNotifications,
-      });
-      localStorage.setItem('adminSettings', JSON.stringify(adminSettings));
-      localStorage.setItem('adminNotifications', JSON.stringify(notifications));
+      // Sauvegarder les paramètres dans Supabase
       toast({
         title: "Paramètres sauvegardés",
         description: "La configuration système a été mise à jour",
@@ -271,32 +207,7 @@ export default function Admin() {
     }
   };
 
-  // Exporter un rapport CSV simple
-  const exportAdminReport = () => {
-    const rows: Array<Record<string, string | number>> = [];
-    if (systemStats) {
-      rows.push({ metric: 'active_users', value: systemStats.activeUsers });
-      rows.push({ metric: 'total_users', value: systemStats.totalUsers });
-      rows.push({ metric: 'total_missions', value: systemStats.totalMissions });
-      rows.push({ metric: 'completed_missions', value: systemStats.completedMissions });
-      rows.push({ metric: 'total_revenue', value: systemStats.totalRevenue });
-      rows.push({ metric: 'system_health', value: systemStats.systemHealth });
-    }
-    const header = 'metric,value';
-    const body = rows.map(r => `${r.metric},${r.value}`).join('\n');
-    const csv = `${header}\n${body}`;
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `admin-report-${new Date().toISOString().slice(0,10)}.csv`;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(url);
-  };
-
-  if (loading) {
+  if (loading || usersLoading || missionsLoading) {
     return (
       <div className="min-h-screen bg-background p-6 flex items-center justify-center">
         <div className="text-center space-y-4">
@@ -409,7 +320,7 @@ export default function Admin() {
 
         {/* Main Admin Tabs */}
         <Tabs defaultValue="users" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-5 glass-card">
+          <TabsList className="grid w-full grid-cols-6 glass-card">
             <TabsTrigger value="users" className="flex items-center gap-2">
               <Users className="w-4 h-4" />
               Utilisateurs ({realUsers.length})
@@ -429,6 +340,10 @@ export default function Admin() {
             <TabsTrigger value="system" className="flex items-center gap-2">
               <Database className="w-4 h-4" />
               Système
+            </TabsTrigger>
+            <TabsTrigger value="vehicles" className="flex items-center gap-2">
+              <Truck className="w-4 h-4" />
+              Véhicules
             </TabsTrigger>
           </TabsList>
 
@@ -483,10 +398,10 @@ export default function Admin() {
                         </TableCell>
                         <TableCell>
                           <div className="flex gap-2">
-                            <Button variant="ghost" size="sm" title="Voir le profil" onClick={() => navigate(`/profile/${user.id}`)}>
+                            <Button variant="ghost" size="sm" title="Voir le profil">
                               <Eye className="w-4 h-4" />
                             </Button>
-                            <Button variant="ghost" size="sm" title="Éditer" onClick={() => navigate(`/profile/${user.id}?edit=1`)}>
+                            <Button variant="ghost" size="sm" title="Éditer">
                               <Edit3 className="w-4 h-4" />
                             </Button>
                             <AlertDialog>
@@ -520,6 +435,19 @@ export default function Admin() {
                     ))}
                   </TableBody>
                 </Table>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Vehicle Models Catalog */}
+          <TabsContent value="vehicles" className="space-y-6">
+            <Card className="glass-card">
+              <CardHeader>
+                <CardTitle>Catalogue de modèles de véhicules</CardTitle>
+                <CardDescription>Ajoutez, mettez à jour ou supprimez des modèles. Les images doivent être téléversées dans le bucket 'vehicle-assets'.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <VehicleModelsManager />
               </CardContent>
             </Card>
           </TabsContent>
@@ -581,8 +509,8 @@ export default function Admin() {
                             <Button 
                               variant="ghost" 
                               size="sm" 
-                              onClick={() => navigate(`/missions/${mission.id}/edit`)}
-                              title="Voir / éditer"
+                              onClick={() => navigate(`/missions/${mission.id}`)}
+                              title="Voir les détails"
                             >
                               <Eye className="w-4 h-4" />
                             </Button>
@@ -621,17 +549,11 @@ export default function Admin() {
                   </div>
                   <div className="flex items-center justify-between">
                     <Label>Notifications email</Label>
-                    <Switch 
-                      checked={adminSettings.emailNotifications}
-                      onCheckedChange={(checked) => setAdminSettings(prev => ({ ...prev, emailNotifications: checked }))}
-                    />
+                    <Switch />
                   </div>
                   <div className="flex items-center justify-between">
                     <Label>Notifications SMS</Label>
-                    <Switch 
-                      checked={adminSettings.smsNotifications}
-                      onCheckedChange={(checked) => setAdminSettings(prev => ({ ...prev, smsNotifications: checked }))}
-                    />
+                    <Switch />
                   </div>
                   <Button onClick={saveAdminSettings} className="w-full">
                     Sauvegarder les notifications
@@ -784,7 +706,7 @@ export default function Admin() {
                       <span>Revenus générés</span>
                       <span className="font-bold">€{systemStats?.totalRevenue?.toLocaleString() || 0}</span>
                     </div>
-                    <Button className="w-full mt-4" onClick={exportAdminReport}>
+                    <Button className="w-full mt-4">
                       Télécharger le rapport complet
                     </Button>
                   </div>

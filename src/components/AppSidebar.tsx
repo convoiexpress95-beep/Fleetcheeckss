@@ -13,14 +13,11 @@ import {
   Crown,
   Smartphone,
   ShoppingCart,
-  Store,
-  Route as RouteIcon,
-  MessageCircle,
+  Images
 } from "lucide-react";
 import { NavLink, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { useAdmin } from "@/hooks/useAdmin";
-import { useUnreadNotificationsCount } from "@/hooks/useNotifications";
 
 import {
   Sidebar,
@@ -41,24 +38,35 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { BRAND_NAME } from "@/lib/branding";
 
 const mainItems = [
   { title: "Tableau de bord", url: "/dashboard", icon: Home },
   { title: "Missions", url: "/missions", icon: Truck },
   { title: "Nouvelle mission", url: "/missions/new", icon: Plus },
-  { title: "Marketplace", url: "/marketplace", icon: Store },
-  { title: "Messages", url: "/messages", icon: MessageCircle },
-  { title: "Trajets partagés", url: "/trajets", icon: RouteIcon },
   { title: "Contacts", url: "/contacts", icon: Users },
   { title: "Suivi GPS", url: "/tracking", icon: MapPin },
   { title: "Rapports", url: "/reports", icon: FileText },
 ];
 
-const businessItems = [
+const businessItems = (
+  isAdmin: boolean
+) => [
   { title: "Facturation", url: "/billing", icon: CreditCard },
+  { title: "Marketplace", url: "/marketplace", icon: GridIcon },
   { title: "Boutique", url: "/shop", icon: ShoppingCart },
+  ...(isAdmin ? [{ title: "Catalogue images", url: "/catalog", icon: Images }] : []),
 ];
+
+function GridIcon(props: React.SVGProps<SVGSVGElement>) {
+  return (
+    <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" {...props}>
+      <rect x="3" y="3" width="7" height="7" rx="2" />
+      <rect x="14" y="3" width="7" height="7" rx="2" />
+      <rect x="3" y="14" width="7" height="7" rx="2" />
+      <rect x="14" y="14" width="7" height="7" rx="2" />
+    </svg>
+  );
+}
 
 const mobileItems = [
   // Removed mobile demo items
@@ -78,46 +86,22 @@ export function AppSidebar() {
   const { state } = useSidebar();
   const location = useLocation();
   const currentPath = location.pathname;
-  const { data: unreadCount = 0 } = useUnreadNotificationsCount();
 
-  const routeActive = (path: string) =>
-    currentPath === path || currentPath.startsWith(path + "/");
-
+  const isActive = (path: string) => currentPath === path;
   const getNavCls = ({ isActive }: { isActive: boolean }) =>
-    isActive
-      ? "relative bg-primary/10 text-primary font-semibold border border-primary/20 shadow-[inset_0_1px_0_0_rgba(255,255,255,.06)]"
-      : "hover:bg-muted/60 transition-all duration-200";
+    isActive 
+      ? "bg-muted text-foreground font-medium" 
+      : "hover:bg-muted/50 transition-all duration-300";
 
   return (
     <Sidebar className="glass-card border-border/20 backdrop-blur-md bg-background/60 supports-[backdrop-filter]:bg-background/20">
       <SidebarContent className="bg-transparent/50 backdrop-blur-sm">
-        {/* Branding */}
-        <div className="p-4 border-b border-border/20 bg-background/30 backdrop-blur-sm">
-          <div className="flex items-center justify-between gap-3">
-            {(!state || state === 'expanded') ? (
-              <div className="flex flex-col items-start leading-none">
-                <span
-                  className="text-2xl font-extrabold tracking-tight bg-clip-text text-transparent"
-                  style={{
-                    backgroundImage:
-                      "linear-gradient(90deg, #20e3b2 0%, #0ea5e9 100%)",
-                  }}
-                >
-                  FleetChecks
-                </span>
-                <span className="mt-1 text-xs text-muted-foreground">Plateforme</span>
-              </div>
-            ) : (
-              <span
-                className="text-lg font-extrabold bg-clip-text text-transparent"
-                style={{ backgroundImage: "linear-gradient(90deg, #20e3b2 0%, #0ea5e9 100%)" }}
-                aria-label="FleetChecks"
-                title="FleetChecks"
-              >
-                FC
-              </span>
-            )}
-            <SidebarTrigger className="ml-auto" />
+        {/* En-tête: uniquement le nom, sans logo */}
+        <div className="p-6 border-b border-border/20 bg-background/30 backdrop-blur-sm">
+          <div className="flex items-center">
+            {!state || state === 'expanded' ? (
+              <h2 className="font-bold text-lg text-foreground">FleetCheecks</h2>
+            ) : null}
           </div>
         </div>
 
@@ -131,17 +115,11 @@ export function AppSidebar() {
               {mainItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton asChild>
-                    <NavLink to={item.url} className={getNavCls} end={!['/missions','/contacts','/reports','/marketplace','/messages','/trajets','/tracking'].includes(item.url)}>
+                    <NavLink to={item.url} className={getNavCls}>
                       <item.icon className="w-5 h-5" />
                       {!state || state === 'expanded' ? (
                         <span className="font-medium">{item.title}</span>
                       ) : null}
-                      {/* Unread badge for Messages */}
-                      {item.title === 'Messages' && unreadCount > 0 && (
-                        <span className="ml-auto inline-flex items-center justify-center rounded-full bg-primary text-primary-foreground text-[10px] font-semibold px-2 py-0.5">
-                          {unreadCount > 99 ? '99+' : unreadCount}
-                        </span>
-                      )}
                     </NavLink>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
@@ -157,7 +135,7 @@ export function AppSidebar() {
           </SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {businessItems.map((item) => (
+              {businessItems(!!isAdmin).map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton asChild>
                     <NavLink to={item.url} className={getNavCls}>

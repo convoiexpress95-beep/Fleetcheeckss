@@ -66,67 +66,19 @@ export const MapboxMap: React.FC<MapboxMapProps> = ({
   useEffect(() => {
     if (!map.current || isLoading) return;
 
-    // Clear existing markers
+    // Nettoyer les anciens marqueurs
     markersRef.current.forEach(marker => marker.remove());
     markersRef.current = [];
 
     const bounds = new mapboxgl.LngLatBounds();
-    let hasValidCoordinates = false;
+    let hasValid = false;
 
-  missions.forEach((mission) => {
-      // Add pickup marker (green)
-      if (mission.pickup_address) {
-        // For demo purposes, using random coordinates around Paris
-        const pickupLng = 2.3522 + (Math.random() - 0.5) * 0.2;
-        const pickupLat = 48.8566 + (Math.random() - 0.5) * 0.1;
-
-        const pickupMarker = new mapboxgl.Marker({ color: '#22c55e' })
-          .setLngLat([pickupLng, pickupLat])
-          .setPopup(
-            new mapboxgl.Popup().setHTML(`
-              <div class="p-2">
-                <h3 class="font-semibold">${mission.title}</h3>
-                <p class="text-sm text-muted-foreground">Enlèvement</p>
-                <p class="text-sm">${mission.pickup_address}</p>
-              </div>
-            `)
-          )
-          .addTo(map.current!);
-
-        markersRef.current.push(pickupMarker);
-        bounds.extend([pickupLng, pickupLat]);
-        hasValidCoordinates = true;
-
-        pickupMarker.getElement().addEventListener('click', () => {
-          onMissionSelect?.(mission);
-        });
-      }
-
-      // Add delivery marker (red)
-      if (mission.delivery_address) {
-        const deliveryLng = 2.3522 + (Math.random() - 0.5) * 0.2;
-        const deliveryLat = 48.8566 + (Math.random() - 0.5) * 0.1;
-
-        const deliveryMarker = new mapboxgl.Marker({ color: '#ef4444' })
-          .setLngLat([deliveryLng, deliveryLat])
-          .setPopup(
-            new mapboxgl.Popup().setHTML(`
-              <div class="p-2">
-                <h3 class="font-semibold">${mission.title}</h3>
-                <p class="text-sm text-muted-foreground">Livraison</p>
-                <p class="text-sm">${mission.delivery_address}</p>
-              </div>
-            `)
-          )
-          .addTo(map.current!);
-
-        markersRef.current.push(deliveryMarker);
-        bounds.extend([deliveryLng, deliveryLat]);
-        hasValidCoordinates = true;
-      }
-
-      // Add current position marker (blue) if tracking data available
-      if (mission.tracking?.latitude != null && mission.tracking?.longitude != null) {
+    missions.forEach((mission) => {
+      // Marqueur de position actuelle (bleu) si données de tracking
+      if (
+        mission.tracking?.latitude != null &&
+        mission.tracking?.longitude != null
+      ) {
         const currentMarker = new mapboxgl.Marker({ color: '#3b82f6' })
           .setLngLat([mission.tracking.longitude, mission.tracking.latitude])
           .setPopup(
@@ -143,12 +95,12 @@ export const MapboxMap: React.FC<MapboxMapProps> = ({
 
         markersRef.current.push(currentMarker);
         bounds.extend([mission.tracking.longitude, mission.tracking.latitude]);
-        hasValidCoordinates = true;
+        hasValid = true;
+        currentMarker.getElement().addEventListener('click', () => onMissionSelect?.(mission));
       }
     });
 
-    // Fit map to bounds if we have valid coordinates
-    if (hasValidCoordinates && !bounds.isEmpty()) {
+    if (hasValid && !bounds.isEmpty()) {
       map.current.fitBounds(bounds, { padding: 50 });
     }
   }, [missions, isLoading, onMissionSelect]);

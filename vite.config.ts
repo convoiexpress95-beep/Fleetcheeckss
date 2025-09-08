@@ -8,6 +8,10 @@ export default defineConfig(({ mode }) => {
   const supabaseUrl = env.VITE_SUPABASE_URL || "https://lucpsjwaglmiejpfxofe.supabase.co";
 
   return {
+    define: {
+      __APP_VERSION__: JSON.stringify(process.env.npm_package_version || "0.0.0"),
+      __BUILD_TIME__: JSON.stringify(new Date().toISOString()),
+    },
     server: {
       host: "::",
       port: 8080,

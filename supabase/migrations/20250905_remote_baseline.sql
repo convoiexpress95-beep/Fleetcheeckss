@@ -1,0 +1,2 @@
+-- Placeholder migration to align local history with remote version 20250905
+-- This file is intentionally empty (no-op).

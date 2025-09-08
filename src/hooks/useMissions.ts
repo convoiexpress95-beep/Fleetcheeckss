@@ -31,7 +31,9 @@ export const useMissions = (filters: any = {}, page = 0, pageSize = 10) => {
             delivery_contact_email: 'm.leclerc@nice.fr',
             vehicle_type: 'Porte-voiture',
             vehicle_brand: 'Iveco',
-            vehicle_model: 'Daily',
+            vehicle_model_name: 'Daily',
+            vehicle_body_type: 'utilitaire',
+            vehicle_image_path: null,
             license_plate: 'AB-123-CD',
             donor_earning: 800.00,
             driver_earning: 600.00,
@@ -62,7 +64,9 @@ export const useMissions = (filters: any = {}, page = 0, pageSize = 10) => {
             delivery_contact_email: 's.mecaniques@pieces.fr',
             vehicle_type: 'Fourgon',
             vehicle_brand: 'Renault',
-            vehicle_model: 'Master',
+            vehicle_model_name: 'Master',
+            vehicle_body_type: 'utilitaire',
+            vehicle_image_path: null,
             license_plate: 'EF-456-GH',
             donor_earning: 450.00,
             driver_earning: 350.00,
@@ -93,7 +97,9 @@ export const useMissions = (filters: any = {}, page = 0, pageSize = 10) => {
             delivery_contact_email: 'i.nouvelle@toulouse.fr',
             vehicle_type: 'Camion 20m³',
             vehicle_brand: 'Mercedes',
-            vehicle_model: 'Sprinter',
+            vehicle_model_name: 'Sprinter',
+            vehicle_body_type: 'utilitaire',
+            vehicle_image_path: null,
             license_plate: 'IJ-789-KL',
             donor_earning: 600.00,
             driver_earning: 500.00,
@@ -131,27 +137,81 @@ export const useMissions = (filters: any = {}, page = 0, pageSize = 10) => {
       }
 
       // First get missions
-      let query = supabase
-        .from('missions')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      // Apply filters
-      if (filters.status && filters.status !== 'all') {
-        query = query.eq('status', filters.status);
+      // Attempt select with join; if it fails (relation missing), fallback to simple select
+      let missions: any[] | null = null;
+      let count: number | null = null;
+      try {
+  let q1: any = supabase
+          .from('missions')
+          .select(`*, vehicle_model:vehicle_models!missions_vehicle_model_id_fkey(id, make, model, body_type, generation, image_path)`, { count: 'exact' }) // join vehicle model
+          .order('created_at', { ascending: false });
+        if (filters.status && filters.status !== 'all') q1 = q1.eq('status', filters.status);
+        if (filters.kind) q1 = q1.eq('kind', filters.kind);
+        if (filters.vehicleGroup && filters.vehicleGroup !== 'all') {
+          const groupLists: Record<string, string[]> = {
+            leger: ['berline','suv','hatchback','break','monospace','moto','autre'],
+            utilitaire: ['utilitaire','pickup'],
+            poids_lourd: ['camion'],
+          };
+          const arr = groupLists[filters.vehicleGroup] || [];
+          if (arr.length) {
+            const inList = `(${arr.map(v => `"${v}"`).join(',')})`;
+            q1 = q1.or(`vehicle_body_type.in.${inList},vehicle_model.body_type.in.${inList}`);
+          }
+        }
+        // Text search (optional)
+        if (filters.search) q1 = q1.or(`title.ilike.%${filters.search}%,reference.ilike.%${filters.search}%`);
+        // City filters
+        if (filters.departCity) q1 = q1.ilike('pickup_address', `%${filters.departCity}%`);
+        if (filters.arrivalCity) q1 = q1.ilike('delivery_address', `%${filters.arrivalCity}%`);
+        // Date filter (pickup_date in selected day)
+        if (filters.pickupDate) {
+          const start = new Date(filters.pickupDate + 'T00:00:00');
+          const end = new Date(start); end.setDate(end.getDate() + 1);
+          q1 = q1.gte('pickup_date', start.toISOString()).lt('pickup_date', end.toISOString());
+        }
+        // Service type: convoyage vs transport
+        if (filters.serviceType === 'convoyage') q1 = q1.eq('requirement_convoyeur', true);
+        if (filters.serviceType === 'transport') q1 = q1.eq('requirement_transporteur_plateau', true);
+        const res1 = await q1.range(page * pageSize, (page + 1) * pageSize - 1);
+        if (res1.error) throw res1.error;
+        missions = res1.data || [];
+        count = (res1 as any).count ?? null;
+      } catch (_e) {
+  let q2: any = supabase
+          .from('missions')
+          .select('*', { count: 'exact' })
+          .order('created_at', { ascending: false });
+  if (filters.status && filters.status !== 'all') q2 = q2.eq('status', filters.status);
+  if (filters.kind) q2 = q2.eq('kind', filters.kind);
+        if (filters.vehicleGroup && filters.vehicleGroup !== 'all') {
+          const groupLists: Record<string, string[]> = {
+            leger: ['berline','suv','hatchback','break','monospace','moto','autre'],
+            utilitaire: ['utilitaire','pickup'],
+            poids_lourd: ['camion'],
+          };
+          const arr = groupLists[filters.vehicleGroup] || [];
+          if (arr.length) q2 = q2.in('vehicle_body_type', arr);
+        }
+        if (filters.search) q2 = q2.or(`title.ilike.%${filters.search}%,reference.ilike.%${filters.search}%`);
+        if (filters.departCity) q2 = q2.ilike('pickup_address', `%${filters.departCity}%`);
+        if (filters.arrivalCity) q2 = q2.ilike('delivery_address', `%${filters.arrivalCity}%`);
+        if (filters.pickupDate) {
+          const start = new Date(filters.pickupDate + 'T00:00:00');
+          const end = new Date(start); end.setDate(end.getDate() + 1);
+          q2 = q2.gte('pickup_date', start.toISOString()).lt('pickup_date', end.toISOString());
+        }
+        if (filters.serviceType === 'convoyage') q2 = q2.eq('requirement_convoyeur', true);
+        if (filters.serviceType === 'transport') q2 = q2.eq('requirement_transporteur_plateau', true);
+        const res2 = await q2.range(page * pageSize, (page + 1) * pageSize - 1);
+        if (res2.error) throw res2.error;
+        missions = res2.data || [];
+        count = (res2 as any).count ?? null;
       }
-      if (filters.search) {
-        query = query.or(`title.ilike.%${filters.search}%,reference.ilike.%${filters.search}%`);
-      }
-
-      const { data: missions, error, count } = await query
-        .range(page * pageSize, (page + 1) * pageSize - 1);
-
-      if (error) throw error;
 
       // Then get profile information for each mission
       const enrichedMissions = await Promise.all(
-        (missions || []).map(async (mission) => {
+  (missions || []).map(async (mission) => {
           const profileQueries = [];
 
           // Get donor profile
@@ -335,22 +395,14 @@ export const useCreateMission = () => {
       // Generate unique reference
       const reference = `MISSION-${Date.now()}-${Math.random().toString(36).substr(2, 4).toUpperCase()}`;
 
-      // Prépare les champs requis ou par défaut
-      const payload = {
-        ...mission,
-        donor_id: mission?.donor_id ?? user.id,
-        // Valeurs par défaut si la table impose NOT NULL sans défaut
-        donor_earning: mission?.donor_earning ?? 0,
-        driver_earning: mission?.driver_earning ?? 0,
-      };
-
       const { data, error } = await supabase
         .from('missions')
         .insert({
-          ...payload,
+          ...mission,
+          kind: mission?.kind || 'marketplace',
           reference,
           created_by: user.id,
-          status: 'pending',
+          status: 'pending'
         })
         .select()
         .single();

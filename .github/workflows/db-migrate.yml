@@ -1,0 +1,35 @@
+name: Apply Supabase Migrations
+
+on:
+  workflow_dispatch:
+    inputs:
+      db_host:
+        description: 'Supabase DB Host'
+        required: true
+        default: 'db.lucpsjwaglmiejpfxofe.supabase.co'
+      db_name:
+        description: 'Database name'
+        required: true
+        default: 'postgres'
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install psql client
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+
+      - name: Run migrations
+        shell: pwsh
+        env:
+          PGPASSWORD: ${{ secrets.DB_PASSWORD }}
+        run: |
+          ./scripts/apply-supabase-migrations.ps1 -DbHost "${{ github.event.inputs.db_host }}" -DbName "${{ github.event.inputs.db_name }}" -User 'postgres' -SslMode 'require' -MakeBucketPublic

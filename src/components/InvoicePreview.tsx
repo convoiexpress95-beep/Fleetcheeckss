@@ -1,12 +1,10 @@
 import React from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Download, Eye, EyeOff } from 'lucide-react';
+import { Download, Eye, EyeOff, X } from 'lucide-react';
 import { Invoice, CompanyInfo } from '@/hooks/useBilling';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
-
-import { BRAND_LOGO_LOCAL as BRAND_LOGO, BRAND_NAME, withLogoFallback } from "@/lib/branding";
 
 interface InvoicePreviewProps {
   invoice: Invoice;
@@ -105,9 +103,14 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({
               Télécharger PDF
             </Button>
             {onClose && (
-              <Button onClick={onClose} variant="outline" className="border-white/20">
-                <EyeOff className="w-4 h-4 mr-2" />
-                Fermer
+              <Button
+                onClick={onClose}
+                variant="ghost"
+                className="h-8 w-8 p-0 rounded-full hover:bg-white/10"
+                title="Fermer"
+                aria-label="Fermer l'aperçu"
+              >
+                <X className="w-4 h-4" />
               </Button>
             )}
           </div>
@@ -120,10 +123,7 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({
             {/* En-tête */}
             <div className="flex justify-between items-start border-b-2 border-gray-200 pb-6">
               <div className="space-y-2">
-                <div className="flex items-center gap-3">
-                  <img src={BRAND_LOGO} onError={(e) => withLogoFallback(e)} alt={BRAND_NAME} className="h-10 w-auto rounded-xl ring-1 ring-blue-100" style={{ transform: 'scaleX(1.05)' }} />
-                  <h1 className="text-3xl font-bold text-gray-800">{companyInfo.company_name || 'FleetChecks'}</h1>
-                </div>
+                <h1 className="text-3xl font-bold text-gray-800">{companyInfo.company_name}</h1>
                 <div className="text-sm text-gray-600 space-y-1">
                   <p>{companyInfo.address}</p>
                   <p>{companyInfo.postal_code} {companyInfo.city}</p>

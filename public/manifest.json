@@ -1,6 +1,6 @@
 {
-  "name": "FleetCheck - Gestion de Missions",
-  "short_name": "FleetCheck",
+  "name": "FleetCheecks - Gestion de Missions",
+  "short_name": "FleetCheecks",
   "description": "Application de gestion de missions de transport et convoyage",
   "start_url": "/",
   "display": "standalone",
@@ -104,14 +104,14 @@
       "sizes": "1280x720",
       "type": "image/png",
       "form_factor": "wide",
-      "label": "Dashboard FleetCheck"
+  "label": "Dashboard FleetCheecks"
     },
     {
       "src": "/screenshot-narrow.png", 
       "sizes": "640x1136",
       "type": "image/png",
       "form_factor": "narrow",
-      "label": "FleetCheck Mobile"
+  "label": "FleetCheecks Mobile"
     }
   ]
 }
