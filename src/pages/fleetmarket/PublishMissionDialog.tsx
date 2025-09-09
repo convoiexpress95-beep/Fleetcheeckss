@@ -6,7 +6,8 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { findVehicleByName, getAllBrands, getVehiclesByBrand, getVehiclesSortedByBrand } from '@/data/fleetmarketVehicles';
-import { supabase } from '@/integrations/supabase/client';
+// Pas de connexion directe supabase ici – usage service mock
+import { publishMission } from '@/services/fleetMarketService';
 import { useToast } from '@/hooks/use-toast';
 import { Plus, Car, MapPin, Calendar, Euro, FileText, Loader2 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
@@ -30,25 +31,23 @@ export function PublishMissionDialog({ onCreated }: Props){
       return toast({ title:'Champs manquants', description:'Complétez les champs obligatoires', variant:'destructive'});
     }
     setSubmitting(true);
-    const { error } = await supabase.from('marketplace_missions').insert({
-      titre: `Transport ${form.vehicle} - ${form.departure} vers ${form.arrival}`,
-      ville_depart: form.departure,
-      ville_arrivee: form.arrival,
-      date_depart: form.departureDate ? new Date(form.departureDate).toISOString(): null,
-      vehicule_requis: form.vehicle,
-      prix_propose: parseFloat(form.price),
-      description: form.description || null,
-      created_by: user.id,
-      statut: 'ouverte'
-    });
-    if(error){
-      console.error(error);
-      toast({ title:'Erreur', description:"Échec de la publication", variant:'destructive'});
-    } else {
-      toast({ title:'Mission publiée', description:'Visible dans FleetMarket'});
+    try {
+      await publishMission({
+        titre: `Transport ${form.vehicle} - ${form.departure} vers ${form.arrival}`,
+        ville_depart: form.departure,
+        ville_arrivee: form.arrival,
+        date_depart: form.departureDate ? new Date(form.departureDate).toISOString(): null,
+        vehicule_requis: form.vehicle,
+        prix_propose: parseFloat(form.price),
+        description: form.description || null
+      } as any);
+      toast({ title:'Mission publiée', description:'Enregistrée (mock)'});
       setIsOpen(false);
       setForm({ departure:'', arrival:'', departureDate:'', vehicle:'', price:'', description:'' });
       onCreated?.();
+    } catch(e:any){
+      console.error(e);
+      toast({ title:'Erreur', description:"Échec de la publication", variant:'destructive'});
     }
     setSubmitting(false);
   };

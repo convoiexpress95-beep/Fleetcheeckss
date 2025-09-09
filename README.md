@@ -65,3 +65,20 @@ Yes, you can!
 
 
 Read more here: [Setting up a custom domain](https://docs.lovable.dev/tips-tricks/custom-domain#step-by-step-guide)
+
+## FleetMarket (extraction partielle)
+
+Une première intégration "FleetMarket" a été ajoutée :
+
+- Route protégée: `/fleetmarket`
+- Composants: `FleetMarketMissionCard`, service mock `fleetMarketService`, dialogue publication simplifié.
+- Aucune dépendance directe à Supabase (service mock en mémoire pour l’instant).
+
+Le dossier `drive-connect-suite-main/` a été importé uniquement pour extraire styles et patterns. Il sera supprimé après validation et avant push final afin de réduire le bruit et corriger les erreurs ESLint multi-tsconfig.
+
+Étapes suivantes proposées:
+1. Valider le design et le flux fonctionnel mock.
+2. Créer une table (ou réutiliser `missions`) pour persister les données FleetMarket.
+3. Remplacer le service mock par des appels API (Supabase ou edge functions).
+4. Supprimer le dossier `drive-connect-suite-main/` et ajuster la configuration ESLint.
+

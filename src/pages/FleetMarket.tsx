@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react';
-import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { FleetMarketMission, FleetMarketMissionCard } from '@/components/FleetMarketMissionCard';
 import { Button } from '@/components/ui/button';
-import { Plus, RefreshCw } from 'lucide-react';
+import { RefreshCw } from 'lucide-react';
 import { PublishMissionDialog } from '@/pages/fleetmarket/PublishMissionDialog';
+import { listMissions } from '@/services/fleetMarketService';
 
 export default function FleetMarketPage(){
   const { toast } = useToast();
@@ -13,17 +13,15 @@ export default function FleetMarketPage(){
 
   const load = async () => {
     setLoading(true);
-    const { data, error } = await supabase
-      .from('marketplace_missions')
-      .select('*')
-      .order('created_at', { ascending: false });
-    if(error){
-      console.error(error);
-      toast({ title: 'Erreur', description: 'Impossible de charger les missions', variant: 'destructive'});
-    } else {
-      setMissions(data as any);
+    try {
+      const data = await listMissions();
+      setMissions(data);
+    } catch (e:any) {
+      console.error(e);
+      toast({ title: 'Erreur', description: 'Chargement missions indisponible', variant: 'destructive'});
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   useEffect(()=>{ load(); },[]);
@@ -32,7 +30,7 @@ export default function FleetMarketPage(){
     <div className='p-6 space-y-6'>
       <div className='flex flex-wrap items-center gap-3'>
         <h1 className='text-2xl font-semibold'>FleetMarket</h1>
-        <PublishMissionDialog onCreated={load} />
+  <PublishMissionDialog onCreated={load} />
         <Button size='sm' variant='outline' onClick={load} disabled={loading}>
           <RefreshCw className='w-4 h-4 mr-1 animate-spin' style={{ animationPlayState: loading ? 'running':'paused'}} />
           Actualiser
