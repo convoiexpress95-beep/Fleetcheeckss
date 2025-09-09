@@ -15,12 +15,30 @@ export function useFleetMarketMissions(){
 
   const setStatus = useMutation({
     mutationFn: ({ id, statut }: { id:string; statut: 'ouverte'|'en_negociation'|'attribuee'|'terminee'|'annulee' }) => updateMissionStatus(id, statut),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: KEY }); }
+    onMutate: async (vars) => {
+      await qc.cancelQueries({ queryKey: KEY });
+      const prev = qc.getQueryData<FleetMarketMission[]>(KEY);
+      if (prev) {
+        qc.setQueryData<FleetMarketMission[]>(KEY, prev.map(m => m.id === vars.id ? { ...m, statut: vars.statut } : m));
+      }
+      return { prev };
+    },
+    onError: (_e, _vars, ctx) => { if (ctx?.prev) qc.setQueryData(KEY, ctx.prev); },
+    onSettled: () => { qc.invalidateQueries({ queryKey: KEY }); }
   });
 
   const assign = useMutation({
     mutationFn: ({ id, convoyeurUserId }: { id:string; convoyeurUserId:string }) => assignMission(id, convoyeurUserId),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: KEY }); }
+    onMutate: async (vars) => {
+      await qc.cancelQueries({ queryKey: KEY });
+      const prev = qc.getQueryData<FleetMarketMission[]>(KEY);
+      if (prev) {
+        qc.setQueryData<FleetMarketMission[]>(KEY, prev.map(m => m.id === vars.id ? { ...m, statut: 'attribuee', convoyeur_id: vars.convoyeurUserId } : m));
+      }
+      return { prev };
+    },
+    onError: (_e, _vars, ctx) => { if (ctx?.prev) qc.setQueryData(KEY, ctx.prev); },
+    onSettled: () => { qc.invalidateQueries({ queryKey: KEY }); }
   });
 
   return {
