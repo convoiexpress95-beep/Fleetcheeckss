@@ -52,7 +52,6 @@ const businessItems = (
   isAdmin: boolean
 ) => [
   { title: "Facturation", url: "/billing", icon: CreditCard },
-  { title: "Marketplace", url: "/marketplace", icon: GridIcon },
   { title: "Boutique", url: "/shop", icon: ShoppingCart },
   ...(isAdmin ? [{ title: "Catalogue images", url: "/catalog", icon: Images }] : []),
 ];

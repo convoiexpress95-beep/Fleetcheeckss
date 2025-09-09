@@ -10,24 +10,25 @@ import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useConvoiturage } from "@/hooks/useConvoiturage";
 import { useToast } from "@/hooks/use-toast";
+import type { Ride } from "@/types/convoiturage";
 
 const TripDetails = () => {
   const { id } = useParams();
-  const [ride, setRide] = useState<any | null>(null);
+  const [ride, setRide] = useState<Ride | null>(null);
   const { reserveRide } = useConvoiturage();
   const { toast } = useToast();
 
   useEffect(()=>{
     let active = true;
     const load = async () => {
-      const { data } = await (supabase as any).from('rides').select('*').eq('id', id).maybeSingle();
+      const { data } = await supabase.from('rides').select('*').eq('id', id).maybeSingle() as { data: Ride | null };
       if (active) setRide(data);
     };
     if (id) load();
     const ch = supabase
       .channel(`rt:ride:${id}`)
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'rides', filter: `id=eq.${id}` }, (p: any)=>{
-        setRide(p.new);
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'rides', filter: `id=eq.${id}` }, (payload:{ new?: Ride })=>{
+        if(payload.new) setRide(payload.new);
       })
       .subscribe();
     return ()=>{ active = false; supabase.removeChannel(ch); };
@@ -264,8 +265,9 @@ const TripDetails = () => {
                     try {
                       await reserveRide(trip.id, 1);
                       toast({ title: "Demande envoyée", description: "Votre réservation est en attente de confirmation." });
-                    } catch (e: any) {
-                      toast({ title: "Erreur", description: e?.message || "Impossible de réserver", variant: "destructive" });
+                    } catch (e: unknown) {
+                      const msg = e instanceof Error ? e.message : "Impossible de réserver";
+                      toast({ title: "Erreur", description: msg, variant: "destructive" });
                     }
                   }}>
                     Réserver ce trajet

@@ -9,51 +9,61 @@ import { Send, Search, Phone, MoreVertical, MapPin } from "lucide-react";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import type { ConversationItem, UIMessageItem, Ride, RideMessageRow } from "@/types/convoiturage";
 
 const Messages = () => {
   const [selectedConversation, setSelectedConversation] = useState<string | null>(null);
   const [newMessage, setNewMessage] = useState("");
-  const [conversations, setConversations] = useState<any[]>([]);
-  const [messages, setMessages] = useState<any[]>([]);
+  const [conversations, setConversations] = useState<ConversationItem[]>([]);
+  const [messages, setMessages] = useState<UIMessageItem[]>([]);
   const { user } = useAuth();
 
   // Load rides where user is participant (driver or passenger)
   useEffect(()=>{
     const loadConversations = async () => {
-      const { data: asDriver } = await (supabase as any).from('rides').select('*').eq('driver_id', user?.id).limit(20);
-      const { data: asPassenger } = await (supabase as any)
+      if(!user?.id){ setConversations([]); return; }
+      type RideReservation = { ride_id: string };
+      const { data: asDriver } = await supabase.from('rides').select('*').eq('driver_id', user.id).limit(20) as { data: Ride[] | null };
+      const { data: asPassenger } = await supabase
         .from('ride_reservations')
         .select('ride_id')
-        .eq('passenger_id', user?.id)
-        .limit(50);
+        .eq('passenger_id', user.id)
+        .limit(50) as { data: RideReservation[] | null };
       const rideIds = new Set<string>();
-      (asDriver||[]).forEach((r:any)=>rideIds.add(r.id));
-      (asPassenger||[]).forEach((r:any)=>rideIds.add(r.ride_id));
+      (asDriver||[]).forEach(r=>r && rideIds.add(r.id));
+      (asPassenger||[]).forEach(r=>r && rideIds.add(r.ride_id));
       const ids = Array.from(rideIds);
       if (!ids.length) { setConversations([]); return; }
-      const { data: rides } = await (supabase as any).from('rides').select('*').in('id', ids).order('departure_time',{ascending:false});
-      setConversations((rides||[]).map((r:any)=>({
+      const { data: rides } = await supabase.from('rides').select('*').in('id', ids).order('departure_time',{ascending:false}) as { data: Ride[] | null };
+    const mapped: ConversationItem[] = (rides||[]).map(r=>({
         id: r.id,
         participant: { name: 'Participant', avatar: '/placeholder-avatar.jpg', online: false },
         lastMessage: { text: '', time: '', unread: false, sender: 'them' },
-        trip: { departure: r.departure, destination: r.destination, date: new Date(r.departure_time).toLocaleDateString('fr-FR'), time: new Date(r.departure_time).toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'}) },
-      })));
-      if (!selectedConversation && rides && rides.length) setSelectedConversation(rides[0].id);
+        trip: {
+      id: r.id,
+          departure: r.departure,
+          destination: r.destination,
+          date: new Date(r.departure_time).toLocaleDateString('fr-FR'),
+            time: new Date(r.departure_time).toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'})
+        },
+      }));
+      setConversations(mapped);
+      if (!selectedConversation && mapped.length) setSelectedConversation(mapped[0].id);
     };
     loadConversations();
-  }, [user?.id]);
+  }, [user?.id, selectedConversation]);
 
   // Load messages for selected conversation
   useEffect(()=>{
     if (!selectedConversation) { setMessages([]); return; }
     let active = true;
     const load = async () => {
-      const { data } = await (supabase as any)
+      const { data } = await supabase
         .from('ride_messages')
         .select('*')
         .eq('ride_id', selectedConversation)
-        .order('created_at',{ascending:true});
-      if (active) setMessages((data||[]).map((m:any)=>({
+        .order('created_at',{ascending:true}) as { data: RideMessageRow[] | null };
+      if (active) setMessages((data||[]).map(m=>({
         id: m.id,
         text: m.content,
         sender: m.sender_id === user?.id ? 'me' : 'them',
@@ -64,8 +74,9 @@ const Messages = () => {
     load();
     const ch = supabase
       .channel(`rt:ride_messages:${selectedConversation}`)
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'ride_messages', filter: `ride_id=eq.${selectedConversation}` }, (p:any)=>{
-        const m = p.new;
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'ride_messages', filter: `ride_id=eq.${selectedConversation}` }, (payload:{ new?: RideMessageRow })=>{
+        const m = payload.new;
+        if(!m) return;
         setMessages(prev => [...prev, {
           id: m.id,
           text: m.content,
@@ -82,7 +93,7 @@ const Messages = () => {
 
   const handleSendMessage = async () => {
     if (!newMessage.trim() || !selectedConversation || !user) return;
-    await (supabase as any).from('ride_messages').insert({ ride_id: selectedConversation, sender_id: user.id, content: newMessage.trim() });
+  await supabase.from('ride_messages').insert({ ride_id: selectedConversation, sender_id: user.id, content: newMessage.trim() });
     setNewMessage("");
   };
 

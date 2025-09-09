@@ -399,7 +399,7 @@ export const useCreateMission = () => {
         .from('missions')
         .insert({
           ...mission,
-          kind: mission?.kind || 'marketplace',
+          // champ kind supprimé (plus de marketplace)
           reference,
           created_by: user.id,
           status: 'pending'

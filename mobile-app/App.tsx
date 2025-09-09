@@ -20,7 +20,6 @@ import { useAuth } from './src/contexts/AuthContext';
 import ShopScreen from './src/screens/ShopScreen';
 import { CreditsPill } from './src/components/CreditsPill';
 import { useNavigation } from '@react-navigation/native';
-import MarketplaceScreen from './src/screens/MarketplaceScreen';
 import MessagesScreen from './src/screens/MessagesScreen';
 import ProfileScreen from './src/screens/ProfileScreen';
 import PublicTrackingScreen from './src/screens/PublicTrackingScreen';
@@ -93,11 +92,7 @@ function MainTabs() {
         component={ReportsScreen}
         options={{ title: 'Rapports', tabBarButton: () => null }}
       />
-      <Tab.Screen
-        name="Outils"
-        component={MarketplaceScreen}
-        options={{ title: 'Outils' }}
-      />
+  {/* Onglet Outils / Marketplace supprimé */}
       <Tab.Screen 
         name="Contacts" 
         component={ContactsScreen}
