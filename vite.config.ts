@@ -14,7 +14,7 @@ export default defineConfig(({ mode }) => {
     },
     server: {
       host: "::",
-      port: 8080,
+      port: 8086,
       proxy: {
         "/supabase": {
           target: supabaseUrl,
