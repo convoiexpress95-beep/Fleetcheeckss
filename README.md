@@ -66,19 +66,20 @@ Yes, you can!
 
 Read more here: [Setting up a custom domain](https://docs.lovable.dev/tips-tricks/custom-domain#step-by-step-guide)
 
-## FleetMarket (extraction partielle)
+## FleetMarket (intégration actuelle)
 
-Une première intégration "FleetMarket" a été ajoutée :
+Une première intégration "FleetMarket" est en place :
 
 - Route protégée: `/fleetmarket`
-- Composants: `FleetMarketMissionCard`, service mock `fleetMarketService`, dialogue publication simplifié.
-- Aucune dépendance directe à Supabase (service mock en mémoire pour l’instant).
+- Composants: `FleetMarketMissionCard`, service mock `fleetMarketService`, dialogue de publication simplifié
+- Aucune dépendance directe à Supabase (mock en mémoire)
 
-Le dossier `drive-connect-suite-main/` a été importé uniquement pour extraire styles et patterns. Il sera supprimé après validation et avant push final afin de réduire le bruit et corriger les erreurs ESLint multi-tsconfig.
+Le dossier externe `drive-connect-suite-main/` a été IMPORTÉ puis SUPPRIMÉ (nettoyage effectué) après extraction des patterns UI, afin d’éliminer le bruit Git et les warnings ESLint multi-tsconfig.
 
-Étapes suivantes proposées:
-1. Valider le design et le flux fonctionnel mock.
-2. Créer une table (ou réutiliser `missions`) pour persister les données FleetMarket.
-3. Remplacer le service mock par des appels API (Supabase ou edge functions).
-4. Supprimer le dossier `drive-connect-suite-main/` et ajuster la configuration ESLint.
+Étapes suivantes suggérées:
+1. Valider UX/UI et données mock côté métier.
+2. Créer une table dédiée (ex: `fleetmarket_missions`) ou étendre `missions` (migration + RLS).
+3. Remplacer le service mock par une couche data (Supabase RPC / insert + policies).
+4. Ajouter tests légers (listing + publication) et feature flag si besoin.
+5. Optimiser chargement (lazy split de la page si poids augmente, préfetch sur hover du bouton).
 
