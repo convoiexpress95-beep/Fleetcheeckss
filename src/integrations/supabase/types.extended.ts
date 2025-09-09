@@ -252,6 +252,41 @@ type PublicWithQuotes<P extends BaseDatabase['public']> = Merge<P, {
       Update: Partial<PublicWithQuotes<P>['Tables']['ride_message_reads']['Insert']>;
       Relationships: [];
     };
+    // Ajout FleetMarket
+    fleetmarket_missions: {
+      Row: {
+        id: string;
+        created_by: string;
+        titre: string;
+        description: string | null;
+        ville_depart: string;
+        ville_arrivee: string;
+        date_depart: string; // timestamptz
+        prix_propose: number | null;
+        statut: 'ouverte' | 'en_negociation' | 'attribuee' | 'terminee' | 'annulee';
+        vehicule_requis: string | null;
+        contact_visible: boolean;
+        created_at: string;
+        updated_at: string;
+      };
+      Insert: {
+        id?: string;
+        created_by: string;
+        titre: string;
+        description?: string | null;
+        ville_depart: string;
+        ville_arrivee: string;
+        date_depart: string; // timestamptz
+        prix_propose?: number | null;
+        statut?: 'ouverte' | 'en_negociation' | 'attribuee' | 'terminee' | 'annulee';
+        vehicule_requis?: string | null;
+        contact_visible?: boolean;
+        created_at?: string;
+        updated_at?: string;
+      };
+      Update: Partial<PublicWithQuotes<P>['Tables']['fleetmarket_missions']['Insert']>;
+      Relationships: [];
+    };
   }>;
   Functions: Merge<P['Functions'], {
     generate_quote_number: {
