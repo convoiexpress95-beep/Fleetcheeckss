@@ -3,7 +3,18 @@ import { supabase } from '@/integrations/supabase/client';
 
 // Fallback mémoire si supabase échoue
 let memory: FleetMarketMission[] = [
-  { id: 'm-demo-1', titre: 'Mission démo', description: 'Trajet Paris → Lyon', ville_depart: 'Paris', ville_arrivee: 'Lyon', date_depart: new Date().toISOString(), prix_propose: 250, statut: 'ouverte', vehicule_requis: 'berline' } as any
+  {
+    id: 'm-demo-1',
+    titre: 'Mission démo',
+    description: 'Trajet Paris → Lyon',
+    ville_depart: 'Paris',
+    ville_arrivee: 'Lyon',
+    date_depart: new Date().toISOString(),
+    prix_propose: 250,
+    statut: 'ouverte',
+    vehicule_requis: 'berline',
+    convoyeur_id: null
+  }
 ];
 
 type FleetRowInsert = {
@@ -22,17 +33,30 @@ type FleetRowInsert = {
   updated_at?: string;
 };
 
-const mapRow = (r: any): FleetMarketMission => ({
+interface FleetRowSelect {
+  id: string;
+  titre: string;
+  description: string | null;
+  ville_depart: string;
+  ville_arrivee: string;
+  date_depart: string;
+  prix_propose: number | null;
+  statut: FleetMarketMission['statut'];
+  vehicule_requis: string | null;
+  convoyeur_id: string | null;
+}
+
+const mapRow = (r: FleetRowSelect): FleetMarketMission => ({
   id: r.id,
   titre: r.titre,
-  description: r.description || '',
+  description: r.description ?? '',
   ville_depart: r.ville_depart,
   ville_arrivee: r.ville_arrivee,
   date_depart: r.date_depart,
   prix_propose: r.prix_propose ?? undefined,
   statut: r.statut,
-  vehicule_requis: r.vehicule_requis || undefined,
-  convoyeur_id: r.convoyeur_id || null
+  vehicule_requis: r.vehicule_requis ?? undefined,
+  convoyeur_id: r.convoyeur_id
 });
 
 export async function listMissions(): Promise<FleetMarketMission[]> {
@@ -50,33 +74,34 @@ export async function listMissions(): Promise<FleetMarketMission[]> {
   }
 }
 
-export async function publishMission(partial: Omit<FleetMarketMission,'id'|'statut'>): Promise<FleetMarketMission> {
-  const user = (await supabase.auth.getUser()).data.user;
+export async function publishMission(partial: Omit<FleetMarketMission,'id'|'statut'|'convoyeur_id'>): Promise<FleetMarketMission> {
+  const { data: authData } = await supabase.auth.getUser();
+  const userId = authData?.user?.id ?? '00000000-0000-0000-0000-000000000000';
   const row: FleetRowInsert = {
-    created_by: user?.id || '00000000-0000-0000-0000-000000000000',
-    titre: (partial as any).titre,
-    description: (partial as any).description ?? null,
-    ville_depart: (partial as any).ville_depart || 'À définir',
-    ville_arrivee: (partial as any).ville_arrivee || 'À définir',
-    date_depart: (partial as any).date_depart || new Date().toISOString(),
-    prix_propose: (partial as any).prix_propose ?? null,
-    vehicule_requis: (partial as any).vehicule_requis ?? null,
+    created_by: userId,
+    titre: partial.titre,
+    description: partial.description ?? null,
+    ville_depart: partial.ville_depart || 'À définir',
+    ville_arrivee: partial.ville_arrivee || 'À définir',
+    date_depart: partial.date_depart || new Date().toISOString(),
+    prix_propose: partial.prix_propose ?? null,
+    vehicule_requis: partial.vehicule_requis ?? null,
     statut: 'ouverte'
   };
   try {
     const { data, error } = await supabase
       .from('fleetmarket_missions')
-      .insert(row as any)
+      .insert(row)
       .select('*')
       .single();
     if (error) throw error;
     const mission = mapRow(data);
     // Mettre aussi en cache mémoire
-    memory.unshift(mission as any);
+    memory.unshift(mission);
     return mission;
   } catch (e) {
     console.warn('[FleetMarket] fallback mémoire publishMission', e);
-    const mission: FleetMarketMission = { id: 'm-'+Date.now(), statut: 'ouverte', ...(partial as any) };
+    const mission: FleetMarketMission = { id: 'm-'+Date.now(), statut: 'ouverte', convoyeur_id: null, ...partial };
     memory.unshift(mission);
     return mission;
   }
@@ -92,11 +117,11 @@ export async function updateMissionStatus(id: string, statut: 'ouverte'|'en_nego
       .single();
     if (error) throw error;
     // sync mémoire
-    memory = memory.map(m => m.id === id ? { ...m, statut } as any : m);
+  memory = memory.map(m => m.id === id ? { ...m, statut } : m);
     return mapRow(data);
   } catch (e) {
     console.warn('[FleetMarket] fallback mémoire updateMissionStatus', e);
-    memory = memory.map(m => m.id === id ? { ...m, statut } as any : m);
+  memory = memory.map(m => m.id === id ? { ...m, statut } : m);
     return memory.find(m => m.id === id)!;
   }
 }
@@ -110,11 +135,11 @@ export async function assignMission(id: string, convoyeurUserId: string) {
       .select('*')
       .single();
     if (error) throw error;
-    memory = memory.map(m => m.id === id ? { ...m, statut: 'attribuee', convoyeur_id: convoyeurUserId } as any : m);
+  memory = memory.map(m => m.id === id ? { ...m, statut: 'attribuee', convoyeur_id: convoyeurUserId } : m);
     return mapRow(data);
   } catch (e) {
     console.warn('[FleetMarket] fallback mémoire assignMission', e);
-    memory = memory.map(m => m.id === id ? { ...m, statut: 'attribuee', convoyeur_id: convoyeurUserId } as any : m);
+  memory = memory.map(m => m.id === id ? { ...m, statut: 'attribuee', convoyeur_id: convoyeurUserId } : m);
     return memory.find(m => m.id === id)!;
   }
 }
