@@ -1,8 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<resources>
-  <color name="launcher_background">#2563EB</color>
-  <color name="splashscreen_background">#2563eb</color>
-  <color name="colorPrimary">#023c69</color>
-  <color name="colorPrimaryDark">#2563eb</color>
-  <color name="notification_icon_color">#2563eb</color>
-</resources>
