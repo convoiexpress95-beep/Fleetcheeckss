@@ -7,6 +7,7 @@ import { PublishMissionDialog } from '@/pages/fleetmarket/PublishMissionDialog';
 import { listMissions } from '@/services/fleetMarketService';
 
 export default function FleetMarketPage(){
+  console.debug('[FleetMarket] mount, location should be /fleetmarket');
   const { toast } = useToast();
   const [missions, setMissions] = useState<FleetMarketMission[]>([]);
   const [loading, setLoading] = useState(true);
