@@ -1,8 +1,21 @@
-import { serve } from "std/http/server.ts";
+// Import figé de la std Deno pour stabilité locale/CI
+// @ts-expect-error Deno remote import (résolu dans runtime Deno)
+import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
+// @ts-expect-error pdf-lib via esm.sh pour l'environnement Deno
+import { PDFDocument, StandardFonts, rgb, type PDFPage, type PDFImage } from 'https://esm.sh/pdf-lib@1.17.1';
 import { createClient } from '@supabase/supabase-js';
-import { PDFDocument, StandardFonts, rgb } from 'https://esm.sh/pdf-lib@1.17.1';
-// deno-lint-ignore no-explicit-any
-declare const Deno: any;
+
+declare const Deno: { env: { get(k: string): string | undefined } };
+
+interface MissionRow {
+  id: string;
+  reference: string | null;
+  title: string | null;
+  pickup_address?: string | null;
+  delivery_address?: string | null;
+}
+
+interface StoredFileRef { path: string; name: string; folder: string }
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -33,7 +46,7 @@ serve(async (req) => {
     const supabase = createClient(SUPA_URL, SERVICE_ROLE_KEY);
 
     // Vérifier l'existence de la mission
-    const { data: mission, error: missionErr } = await supabase
+  const { data: mission, error: missionErr } = await supabase
       .from('missions')
       .select('id, reference, title, pickup_address, delivery_address')
       .eq('id', missionId)
@@ -44,6 +57,9 @@ serve(async (req) => {
         status: 404,
       });
     }
+
+  // Mission typée localement
+  const missionRow: MissionRow = mission as MissionRow;
 
   // Lister les chemins connus (par sections)
     const basePath = `missions/${missionId}`;
@@ -73,10 +89,10 @@ serve(async (req) => {
 
   // Métadonnées PDF
   const now = new Date();
-  pdfDoc.setTitle(`Rapport mission ${mission.reference || mission.id}`);
+  pdfDoc.setTitle(`Rapport mission ${missionRow.reference || missionRow.id}`);
   pdfDoc.setAuthor('FleetChecks');
   pdfDoc.setSubject('Rapport de mission avec photos');
-  pdfDoc.setKeywords(['FleetChecks', 'Rapport', 'Mission', String(mission.reference || mission.id)]);
+  pdfDoc.setKeywords(['FleetChecks', 'Rapport', 'Mission', String(missionRow.reference || missionRow.id)]);
   pdfDoc.setProducer('FleetChecks Exporter');
   pdfDoc.setCreator('FleetChecks PDF Generator');
   pdfDoc.setCreationDate(now);
@@ -92,11 +108,11 @@ serve(async (req) => {
     const COVER_W = A4_WIDTH, COVER_H = A4_HEIGHT, COVER_MARGIN = MARGIN;
     const cover = pdfDoc.addPage([COVER_W, COVER_H]);
     cover.drawText('Rapport de mission', { x: COVER_MARGIN, y: COVER_H - 2 * COVER_MARGIN, size: 24, font, color: rgb(0.1, 0.1, 0.1) });
-    cover.drawText(`Titre: ${mission.title || '-'}`, { x: COVER_MARGIN, y: COVER_H - 2 * COVER_MARGIN - 32, size: 14, font });
-    cover.drawText(`Référence: ${mission.reference || mission.id}`, { x: COVER_MARGIN, y: COVER_H - 2 * COVER_MARGIN - 52, size: 14, font });
-    if ((mission as any).pickup_address || (mission as any).delivery_address) {
-      cover.drawText(`De: ${(mission as any).pickup_address || '-'}`, { x: COVER_MARGIN, y: COVER_H - 2 * COVER_MARGIN - 80, size: 12, font, color: rgb(0.25,0.25,0.25) });
-      cover.drawText(`À: ${(mission as any).delivery_address || '-'}`, { x: COVER_MARGIN, y: COVER_H - 2 * COVER_MARGIN - 98, size: 12, font, color: rgb(0.25,0.25,0.25) });
+    cover.drawText(`Titre: ${missionRow.title || '-'}`, { x: COVER_MARGIN, y: COVER_H - 2 * COVER_MARGIN - 32, size: 14, font });
+    cover.drawText(`Référence: ${missionRow.reference || missionRow.id}`, { x: COVER_MARGIN, y: COVER_H - 2 * COVER_MARGIN - 52, size: 14, font });
+    if (missionRow.pickup_address || missionRow.delivery_address) {
+      cover.drawText(`De: ${missionRow.pickup_address || '-'}`, { x: COVER_MARGIN, y: COVER_H - 2 * COVER_MARGIN - 80, size: 12, font, color: rgb(0.25,0.25,0.25) });
+      cover.drawText(`À: ${missionRow.delivery_address || '-'}`, { x: COVER_MARGIN, y: COVER_H - 2 * COVER_MARGIN - 98, size: 12, font, color: rgb(0.25,0.25,0.25) });
     }
 
     // Logo optionnel (PDF_LOGO_URL ou COMPANY_LOGO_URL)
@@ -109,12 +125,15 @@ serve(async (req) => {
         if (lr.ok) {
           const lType = lr.headers.get('content-type') || '';
           const lBytes = new Uint8Array(await lr.arrayBuffer());
-          let logoImg: any = null;
+          let logoImg: PDFImage | undefined;
           try {
             if (lType.includes('png')) logoImg = await pdfDoc.embedPng(lBytes);
             else if (lType.includes('jpeg') || lType.includes('jpg')) logoImg = await pdfDoc.embedJpg(lBytes);
-            else { try { logoImg = await pdfDoc.embedPng(lBytes); } catch { logoImg = await pdfDoc.embedJpg(lBytes); } }
-          } catch {}
+            else {
+              try { logoImg = await pdfDoc.embedPng(lBytes); }
+              catch { logoImg = await pdfDoc.embedJpg(lBytes); }
+            }
+          } catch (_) { /* Ignorer échec d'intégration du logo */ }
           if (logoImg) {
             const maxLogoW = 140;
             const scaled = logoImg.scale(1);
@@ -145,7 +164,7 @@ serve(async (req) => {
 
     // Pagination simple sur pages de contenu (sections et images)
     let pageNo = 1;
-    const drawFooter = (page: any) => {
+  const drawFooter = (page: PDFPage) => {
       page.drawText(`${pageNo}`, { x: A4_WIDTH - MARGIN - 24, y: MARGIN / 2, size: 10, font, color: rgb(0.5,0.5,0.5) });
       pageNo += 1;
     };
@@ -175,13 +194,17 @@ serve(async (req) => {
         const contentType = res.headers.get('content-type') || '';
         const bytes = new Uint8Array(await res.arrayBuffer());
 
-        let img: any = null;
+        let img: PDFImage | undefined;
         try {
           if (contentType.includes('png')) img = await pdfDoc.embedPng(bytes);
           else if (contentType.includes('jpeg') || contentType.includes('jpg')) img = await pdfDoc.embedJpg(bytes);
-          else { try { img = await pdfDoc.embedJpg(bytes); } catch (_) { img = await pdfDoc.embedPng(bytes); } }
-        } catch (_) { continue; }
+          else {
+            try { img = await pdfDoc.embedJpg(bytes); }
+            catch { img = await pdfDoc.embedPng(bytes); }
+          }
+        } catch (_) { /* Ignorer fichier image non supporté */ continue; }
 
+        if (!img) continue;
         const imgDims = img.scale(1);
         const maxW = A4_WIDTH - 2 * MARGIN;
         const maxH = A4_HEIGHT - 3 * MARGIN - titleHeight;
@@ -206,7 +229,7 @@ serve(async (req) => {
     }
 
     const pdfBytes = await pdfDoc.save();
-    const filename = `mission-${mission.reference || mission.id}-photos.pdf`;
+  const filename = `mission-${missionRow.reference || missionRow.id}-photos.pdf`;
     return new Response(pdfBytes, {
       headers: {
         ...corsHeaders,
