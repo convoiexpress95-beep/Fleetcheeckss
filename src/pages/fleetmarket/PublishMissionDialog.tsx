@@ -36,12 +36,12 @@ export function PublishMissionDialog({ onCreated }: Props){
         titre: `Transport ${form.vehicle} - ${form.departure} vers ${form.arrival}`,
         ville_depart: form.departure,
         ville_arrivee: form.arrival,
-        date_depart: form.departureDate ? new Date(form.departureDate).toISOString(): null,
+        date_depart: form.departureDate ? new Date(form.departureDate).toISOString(): new Date().toISOString(),
         vehicule_requis: form.vehicle,
         prix_propose: parseFloat(form.price),
         description: form.description || null
       } as any);
-      toast({ title:'Mission publiée', description:'Enregistrée (mock)'});
+      toast({ title:'Mission publiée', description:'Enregistrée (Supabase ou fallback)' });
       setIsOpen(false);
       setForm({ departure:'', arrival:'', departureDate:'', vehicle:'', price:'', description:'' });
       onCreated?.();
