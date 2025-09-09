@@ -101,6 +101,8 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         password,
       });
 
+  if (import.meta.env.DEV) console.debug('[AuthContext.signIn] result', { email, hasError: !!error, error });
+
       if (error) {
         toast({
           title: "Erreur de connexion",
@@ -116,9 +118,9 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       });
 
       return {};
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('SignIn error:', error);
-      return { error };
+      return { error } as { error?: unknown };
     }
   };
 
@@ -137,6 +139,8 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         }
       });
 
+  if (import.meta.env.DEV) console.debug('[AuthContext.signUp] result', { email, hasError: !!error, error });
+
       if (error) {
         toast({
           title: "Erreur d'inscription",
@@ -152,9 +156,9 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       });
 
       return {};
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('SignUp error:', error);
-      return { error };
+      return { error } as { error?: unknown };
     }
   };
 
@@ -165,7 +169,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         title: "Déconnexion réussie",
         description: "À bientôt !",
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('SignOut error:', error);
       toast({
         title: "Erreur",
