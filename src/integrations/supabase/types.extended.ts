@@ -6,7 +6,6 @@ type PublicWithQuotes<P extends BaseDatabase['public']> = Merge<P, {
   Tables: Merge<P['Tables'], {
     missions: Merge<P['Tables']['missions'], {
       Row: Merge<P['Tables']['missions']['Row'], {
-        kind?: 'marketplace' | 'inspection';
         vehicle_body_type?: string | null;
         vehicle_image_path?: string | null;
         requirement_assurance_tous_risques?: boolean;
@@ -16,7 +15,6 @@ type PublicWithQuotes<P extends BaseDatabase['public']> = Merge<P, {
         requirement_convoyeur?: boolean;
       }>;
       Insert: Merge<P['Tables']['missions']['Insert'], {
-        kind?: 'marketplace' | 'inspection';
         vehicle_body_type?: string | null;
         vehicle_image_path?: string | null;
         requirement_assurance_tous_risques?: boolean;
@@ -26,7 +24,6 @@ type PublicWithQuotes<P extends BaseDatabase['public']> = Merge<P, {
         requirement_convoyeur?: boolean;
       }>;
       Update: Merge<P['Tables']['missions']['Update'], {
-        kind?: 'marketplace' | 'inspection';
         vehicle_body_type?: string | null;
         vehicle_image_path?: string | null;
         requirement_assurance_tous_risques?: boolean;

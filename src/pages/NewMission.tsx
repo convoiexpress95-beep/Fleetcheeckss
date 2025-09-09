@@ -248,7 +248,7 @@ const NewMission = () => {
                           ))}
                         </SelectContent>
                       </Select>
-                      <p className="text-xs text-muted-foreground">Choisissez un modèle pour afficher l'image correspondante dans le marketplace.</p>
+                      <p className="text-xs text-muted-foreground">Choisissez un modèle pour afficher l'image correspondante.</p>
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="vehicle_brand">Marque</Label>
