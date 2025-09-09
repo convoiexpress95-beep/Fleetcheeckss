@@ -1,4 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+// NOTE: Ce fichier est revenu à la version fonctionnelle précédente. Les any seront traités plus tard.
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from '@/hooks/use-toast';
@@ -10,10 +12,10 @@ export const useMissions = (filters: any = {}, page = 0, pageSize = 10) => {
 
   const query = useQuery({
     queryKey: ['missions', user?.id, filters, page, pageSize],
-    queryFn: async () => {
+  queryFn: async () => {
       if (!user?.id) {
         // Return demo data when not authenticated
-        const demoMissions = [
+  const demoMissions = [
           {
             id: 'demo-1',
             title: 'Transport véhicule de collection',
@@ -116,7 +118,7 @@ export const useMissions = (filters: any = {}, page = 0, pageSize = 10) => {
         ];
 
         // Apply filters to demo data
-        let filteredMissions = demoMissions;
+  let filteredMissions = demoMissions;
         if (filters.status && filters.status !== 'all') {
           filteredMissions = filteredMissions.filter(m => m.status === filters.status);
         }
@@ -138,9 +140,10 @@ export const useMissions = (filters: any = {}, page = 0, pageSize = 10) => {
 
       // First get missions
       // Attempt select with join; if it fails (relation missing), fallback to simple select
-      let missions: any[] | null = null;
-      let count: number | null = null;
+  let missions: any[] | null = null;
+  let count: number | null = null;
       try {
+        // Requête principale avec jointure optionnelle vers vehicle_models
   let q1: any = supabase
           .from('missions')
           .select(`*, vehicle_model:vehicle_models!missions_vehicle_model_id_fkey(id, make, model, body_type, generation, image_path)`, { count: 'exact' }) // join vehicle model
@@ -175,13 +178,14 @@ export const useMissions = (filters: any = {}, page = 0, pageSize = 10) => {
         if (filters.serviceType === 'transport') q1 = q1.eq('requirement_transporteur_plateau', true);
         const res1 = await q1.range(page * pageSize, (page + 1) * pageSize - 1);
         if (res1.error) throw res1.error;
-        missions = res1.data || [];
-        count = (res1 as any).count ?? null;
+  missions = res1.data || [];
+  count = (res1 as any).count ?? null;
       } catch (_e) {
+        // Fallback sans jointure si la relation n'existe pas encore
   let q2: any = supabase
-          .from('missions')
-          .select('*', { count: 'exact' })
-          .order('created_at', { ascending: false });
+    .from('missions')
+    .select('*', { count: 'exact' })
+    .order('created_at', { ascending: false });
   if (filters.status && filters.status !== 'all') q2 = q2.eq('status', filters.status);
   if (filters.kind) q2 = q2.eq('kind', filters.kind);
         if (filters.vehicleGroup && filters.vehicleGroup !== 'all') {
@@ -191,7 +195,7 @@ export const useMissions = (filters: any = {}, page = 0, pageSize = 10) => {
             poids_lourd: ['camion'],
           };
           const arr = groupLists[filters.vehicleGroup] || [];
-          if (arr.length) q2 = q2.in('vehicle_body_type', arr);
+          if (arr.length) q2 = q2.in('vehicle_body_type', arr as string[]);
         }
         if (filters.search) q2 = q2.or(`title.ilike.%${filters.search}%,reference.ilike.%${filters.search}%`);
         if (filters.departCity) q2 = q2.ilike('pickup_address', `%${filters.departCity}%`);
@@ -205,12 +209,12 @@ export const useMissions = (filters: any = {}, page = 0, pageSize = 10) => {
         if (filters.serviceType === 'transport') q2 = q2.eq('requirement_transporteur_plateau', true);
         const res2 = await q2.range(page * pageSize, (page + 1) * pageSize - 1);
         if (res2.error) throw res2.error;
-        missions = res2.data || [];
-        count = (res2 as any).count ?? null;
+  missions = res2.data || [];
+  count = (res2 as any).count ?? null;
       }
 
       // Then get profile information for each mission
-      const enrichedMissions = await Promise.all(
+    const enrichedMissions = await Promise.all(
   (missions || []).map(async (mission) => {
           const profileQueries = [];
 
@@ -297,7 +301,7 @@ export const useMissions = (filters: any = {}, page = 0, pageSize = 10) => {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [user?.id]);
+  }, [user?.id, queryClient]);
 
   return query;
 };
