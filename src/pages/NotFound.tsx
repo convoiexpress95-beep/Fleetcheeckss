@@ -1,4 +1,4 @@
-import { useLocation } from "react-router-dom";
+import { useLocation, Navigate } from "react-router-dom";
 import { useEffect } from "react";
 
 const NotFound = () => {
@@ -9,7 +9,17 @@ const NotFound = () => {
       "404 Error: User attempted to access non-existent route:",
       location.pathname
     );
+    if (import.meta.env.DEV) {
+      // Log des codes caractères pour détecter espaces ou caractères invisibles
+      console.debug('[NotFound] path debug', location.pathname, location.pathname.split('').map(c => c.charCodeAt(0)));
+    }
   }, [location.pathname]);
+
+  // Si l'URL contient "fleetmarket" mais n'a pas matché, on force une redirection propre.
+  const normalized = location.pathname.toLowerCase().replace(/\/+$/,'');
+  if (normalized.includes('fleetmarket') && normalized !== '/fleetmarket') {
+    return <Navigate to="/fleetmarket" replace />;
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-100">
