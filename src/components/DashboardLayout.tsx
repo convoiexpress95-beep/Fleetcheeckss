@@ -24,6 +24,9 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
               <Button size="sm" variant="outline" asChild>
                 <Link to="/convoiturage">Convoiturage</Link>
               </Button>
+              <Button size="sm" variant="outline" asChild>
+                <Link to="/fleetmarket">FleetMarket</Link>
+              </Button>
               <NotificationBell />
               <CreditsDisplay />
             </div>
