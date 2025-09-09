@@ -266,6 +266,7 @@ type PublicWithQuotes<P extends BaseDatabase['public']> = Merge<P, {
         statut: 'ouverte' | 'en_negociation' | 'attribuee' | 'terminee' | 'annulee';
         vehicule_requis: string | null;
         contact_visible: boolean;
+        convoyeur_id: string | null;
         created_at: string;
         updated_at: string;
       };
@@ -281,6 +282,7 @@ type PublicWithQuotes<P extends BaseDatabase['public']> = Merge<P, {
         statut?: 'ouverte' | 'en_negociation' | 'attribuee' | 'terminee' | 'annulee';
         vehicule_requis?: string | null;
         contact_visible?: boolean;
+        convoyeur_id?: string | null;
         created_at?: string;
         updated_at?: string;
       };

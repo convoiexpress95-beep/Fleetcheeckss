@@ -31,7 +31,8 @@ const mapRow = (r: any): FleetMarketMission => ({
   date_depart: r.date_depart,
   prix_propose: r.prix_propose ?? undefined,
   statut: r.statut,
-  vehicule_requis: r.vehicule_requis || undefined
+  vehicule_requis: r.vehicule_requis || undefined,
+  convoyeur_id: r.convoyeur_id || null
 });
 
 export async function listMissions(): Promise<FleetMarketMission[]> {
@@ -78,5 +79,42 @@ export async function publishMission(partial: Omit<FleetMarketMission,'id'|'stat
     const mission: FleetMarketMission = { id: 'm-'+Date.now(), statut: 'ouverte', ...(partial as any) };
     memory.unshift(mission);
     return mission;
+  }
+}
+
+export async function updateMissionStatus(id: string, statut: 'ouverte'|'en_negociation'|'attribuee'|'terminee'|'annulee') {
+  try {
+    const { data, error } = await supabase
+      .from('fleetmarket_missions')
+      .update({ statut })
+      .eq('id', id)
+      .select('*')
+      .single();
+    if (error) throw error;
+    // sync mémoire
+    memory = memory.map(m => m.id === id ? { ...m, statut } as any : m);
+    return mapRow(data);
+  } catch (e) {
+    console.warn('[FleetMarket] fallback mémoire updateMissionStatus', e);
+    memory = memory.map(m => m.id === id ? { ...m, statut } as any : m);
+    return memory.find(m => m.id === id)!;
+  }
+}
+
+export async function assignMission(id: string, convoyeurUserId: string) {
+  try {
+    const { data, error } = await supabase
+      .from('fleetmarket_missions')
+      .update({ statut: 'attribuee', convoyeur_id: convoyeurUserId })
+      .eq('id', id)
+      .select('*')
+      .single();
+    if (error) throw error;
+    memory = memory.map(m => m.id === id ? { ...m, statut: 'attribuee', convoyeur_id: convoyeurUserId } as any : m);
+    return mapRow(data);
+  } catch (e) {
+    console.warn('[FleetMarket] fallback mémoire assignMission', e);
+    memory = memory.map(m => m.id === id ? { ...m, statut: 'attribuee', convoyeur_id: convoyeurUserId } as any : m);
+    return memory.find(m => m.id === id)!;
   }
 }

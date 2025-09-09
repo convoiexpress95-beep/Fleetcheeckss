@@ -15,6 +15,7 @@ export interface FleetMarketMission {
   vehicule_requis?: string | null;
   description?: string | null;
   statut?: string | null;
+  convoyeur_id?: string | null;
 }
 
 interface Props {
