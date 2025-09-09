@@ -1,38 +1,21 @@
-import { useEffect, useState } from 'react';
-import { useToast } from '@/hooks/use-toast';
-import { FleetMarketMission, FleetMarketMissionCard } from '@/components/FleetMarketMissionCard';
 import { Button } from '@/components/ui/button';
-import { RefreshCw } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
 import { PublishMissionDialog } from '@/pages/fleetmarket/PublishMissionDialog';
-import { listMissions } from '@/services/fleetMarketService';
+import { useFleetMarketMissions } from '@/hooks/useFleetMarketMissions';
+import { RefreshCw } from 'lucide-react';
+import { FleetMarketMissionCard } from '@/components/FleetMarketMissionCard';
 
 export default function FleetMarketPage(){
   console.debug('[FleetMarket] mount, location should be /fleetmarket');
   const { toast } = useToast();
-  const [missions, setMissions] = useState<FleetMarketMission[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  const load = async () => {
-    setLoading(true);
-    try {
-      const data = await listMissions();
-      setMissions(data);
-    } catch (e:any) {
-      console.error(e);
-      toast({ title: 'Erreur', description: 'Chargement missions indisponible', variant: 'destructive'});
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(()=>{ load(); },[]);
+  const { missions, loading, refetch } = useFleetMarketMissions();
 
   return (
     <div className='p-6 space-y-6'>
       <div className='flex flex-wrap items-center gap-3'>
         <h1 className='text-2xl font-semibold'>FleetMarket</h1>
-  <PublishMissionDialog onCreated={load} />
-        <Button size='sm' variant='outline' onClick={load} disabled={loading}>
+        <PublishMissionDialog onCreated={() => refetch()} />
+        <Button size='sm' variant='outline' onClick={() => refetch()} disabled={loading}>
           <RefreshCw className='w-4 h-4 mr-1 animate-spin' style={{ animationPlayState: loading ? 'running':'paused'}} />
           Actualiser
         </Button>
