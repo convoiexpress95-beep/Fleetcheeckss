@@ -13,6 +13,13 @@ build/
 .next/
 .vercel/
 
+# Vendored/embedded repos (ne pas committer des dépôts imbriqués)
+app-syncer/
+app-syncer-main/
+
+# Backups lourds
+backups/*.zip
+
 # Logs & OS
 npm-debug.log*
 yarn-debug.log*
