@@ -22,11 +22,17 @@ export const LiveMap: React.FC<LiveMapProps> = ({ missions, onMissionSelect }) =
   const mapInstanceRef = useRef<google.maps.Map | null>(null);
   const [isLoaded, setIsLoaded] = useState(false);
   const markersRef = useRef<google.maps.Marker[]>([]);
-
-  const GOOGLE_MAPS_API_KEY = 'AIzaSyCdeN_VJpvLb_9Pigkwd_o2WGxDqagKq_Q';
+  // Clé API Google Maps venant de l'environnement (ne jamais coder en dur)
+  const GOOGLE_MAPS_API_KEY = String((import.meta as any)?.env?.VITE_GOOGLE_MAPS_API_KEY || '');
 
   useEffect(() => {
     const initMap = async () => {
+      if (!GOOGLE_MAPS_API_KEY) {
+        if (import.meta.env.DEV) {
+          console.warn('[LiveMap] VITE_GOOGLE_MAPS_API_KEY manquante. Définissez-la dans .env ou variables Vercel.');
+        }
+        return; // attendre que la clé soit définie
+      }
       const loader = new Loader({
         apiKey: GOOGLE_MAPS_API_KEY,
         version: 'weekly',
@@ -225,11 +231,18 @@ export const LiveMap: React.FC<LiveMapProps> = ({ missions, onMissionSelect }) =
   return (
     <div className="w-full h-full relative">
       <div ref={mapRef} className="w-full h-full rounded-lg" />
-      {!isLoaded && (
+      {(!isLoaded || !GOOGLE_MAPS_API_KEY) && (
         <div className="absolute inset-0 flex items-center justify-center bg-gray-900/50 rounded-lg">
           <div className="text-center text-white">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white mx-auto mb-4"></div>
-            <p>Chargement de la carte...</p>
+            {GOOGLE_MAPS_API_KEY
+              ? <p>Chargement de la carte...</p>
+              : (
+                <div>
+                  <p className="mb-1">Clé Google Maps manquante.</p>
+                  <p className="text-white/70 text-sm">Définissez VITE_GOOGLE_MAPS_API_KEY dans votre .env (ou variables Vercel) puis relancez.</p>
+                </div>
+              )}
           </div>
         </div>
       )}
