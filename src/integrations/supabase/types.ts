@@ -308,15 +308,89 @@ export type Database = {
             foreignKeyName: "conversations_mission_id_fkey"
             columns: ["mission_id"]
             isOneToOne: false
-            referencedRelation: "missions"
+            referencedRelation: "marketplace_missions"
             referencedColumns: ["id"]
           },
+        ]
+      }
+      convoyeur_applications: {
+        Row: {
+          admin_notes: string | null
+          company_name: string | null
+          created_at: string
+          driving_experience: number | null
+          driving_license: string | null
+          garage_document_url: string | null
+          id: string
+          kbis_document_url: string | null
+          license_document_url: string | null
+          motivation: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          siret: string | null
+          status: string | null
+          submitted_at: string
+          updated_at: string
+          user_id: string
+          vehicle_types: string | null
+          vigilance_document_url: string | null
+        }
+        Insert: {
+          admin_notes?: string | null
+          company_name?: string | null
+          created_at?: string
+          driving_experience?: number | null
+          driving_license?: string | null
+          garage_document_url?: string | null
+          id?: string
+          kbis_document_url?: string | null
+          license_document_url?: string | null
+          motivation?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          siret?: string | null
+          status?: string | null
+          submitted_at?: string
+          updated_at?: string
+          user_id: string
+          vehicle_types?: string | null
+          vigilance_document_url?: string | null
+        }
+        Update: {
+          admin_notes?: string | null
+          company_name?: string | null
+          created_at?: string
+          driving_experience?: number | null
+          driving_license?: string | null
+          garage_document_url?: string | null
+          id?: string
+          kbis_document_url?: string | null
+          license_document_url?: string | null
+          motivation?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          siret?: string | null
+          status?: string | null
+          submitted_at?: string
+          updated_at?: string
+          user_id?: string
+          vehicle_types?: string | null
+          vigilance_document_url?: string | null
+        }
+        Relationships: [
           {
-            foreignKeyName: "conversations_mission_id_fkey"
-            columns: ["mission_id"]
+            foreignKeyName: "convoyeur_applications_reviewed_by_fkey"
+            columns: ["reviewed_by"]
             isOneToOne: false
-            referencedRelation: "public_mission_tracking"
-            referencedColumns: ["id"]
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "convoyeur_applications_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
           },
         ]
       }
@@ -347,6 +421,122 @@ export type Database = {
           mission_id?: string | null
           transaction_type?: string
           user_id?: string
+        }
+        Relationships: []
+      }
+      event_attendees: {
+        Row: {
+          created_at: string | null
+          event_id: string
+          id: string
+          status: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          event_id: string
+          id?: string
+          status?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          event_id?: string
+          id?: string
+          status?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "event_attendees_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      events: {
+        Row: {
+          attendees_count: number | null
+          created_at: string | null
+          created_by: string
+          description: string | null
+          event_date: string
+          id: string
+          location: string | null
+          title: string
+        }
+        Insert: {
+          attendees_count?: number | null
+          created_at?: string | null
+          created_by: string
+          description?: string | null
+          event_date: string
+          id?: string
+          location?: string | null
+          title: string
+        }
+        Update: {
+          attendees_count?: number | null
+          created_at?: string | null
+          created_by?: string
+          description?: string | null
+          event_date?: string
+          id?: string
+          location?: string | null
+          title?: string
+        }
+        Relationships: []
+      }
+      fleetmarket_missions: {
+        Row: {
+          contact_visible: boolean
+          convoyeur_id: string | null
+          created_at: string
+          created_by: string
+          date_depart: string
+          description: string | null
+          id: string
+          prix_propose: number | null
+          statut: string
+          titre: string
+          updated_at: string
+          vehicule_requis: string | null
+          ville_arrivee: string
+          ville_depart: string
+        }
+        Insert: {
+          contact_visible?: boolean
+          convoyeur_id?: string | null
+          created_at?: string
+          created_by: string
+          date_depart: string
+          description?: string | null
+          id?: string
+          prix_propose?: number | null
+          statut?: string
+          titre: string
+          updated_at?: string
+          vehicule_requis?: string | null
+          ville_arrivee: string
+          ville_depart: string
+        }
+        Update: {
+          contact_visible?: boolean
+          convoyeur_id?: string | null
+          created_at?: string
+          created_by?: string
+          date_depart?: string
+          description?: string | null
+          id?: string
+          prix_propose?: number | null
+          statut?: string
+          titre?: string
+          updated_at?: string
+          vehicule_requis?: string | null
+          ville_arrivee?: string
+          ville_depart?: string
         }
         Relationships: []
       }
@@ -398,13 +588,6 @@ export type Database = {
             referencedRelation: "missions"
             referencedColumns: ["id"]
           },
-          {
-            foreignKeyName: "inspection_arrivals_mission_id_fkey"
-            columns: ["mission_id"]
-            isOneToOne: false
-            referencedRelation: "public_mission_tracking"
-            referencedColumns: ["id"]
-          },
         ]
       }
       inspection_departures: {
@@ -453,13 +636,6 @@ export type Database = {
             columns: ["mission_id"]
             isOneToOne: false
             referencedRelation: "missions"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "inspection_departures_mission_id_fkey"
-            columns: ["mission_id"]
-            isOneToOne: false
-            referencedRelation: "public_mission_tracking"
             referencedColumns: ["id"]
           },
         ]
@@ -602,32 +778,47 @@ export type Database = {
       }
       marketplace_devis: {
         Row: {
+          contest_reason: string | null
+          contested_at: string | null
           convoyeur_id: string
+          counter_offer: number | null
           created_at: string | null
           id: string
           message: string | null
           mission_id: string
+          original_price: number | null
           prix_propose: number
+          response_deadline: string | null
           statut: string | null
           updated_at: string | null
         }
         Insert: {
+          contest_reason?: string | null
+          contested_at?: string | null
           convoyeur_id: string
+          counter_offer?: number | null
           created_at?: string | null
           id?: string
           message?: string | null
           mission_id: string
+          original_price?: number | null
           prix_propose: number
+          response_deadline?: string | null
           statut?: string | null
           updated_at?: string | null
         }
         Update: {
+          contest_reason?: string | null
+          contested_at?: string | null
           convoyeur_id?: string
+          counter_offer?: number | null
           created_at?: string | null
           id?: string
           message?: string | null
           mission_id?: string
+          original_price?: number | null
           prix_propose?: number
+          response_deadline?: string | null
           statut?: string | null
           updated_at?: string | null
         }
@@ -692,6 +883,57 @@ export type Database = {
         }
         Relationships: []
       }
+      messages: {
+        Row: {
+          content: string
+          conversation_id: string
+          created_at: string
+          id: string
+          message_type: string
+          metadata: Json | null
+          read_at: string | null
+          sender_id: string
+          updated_at: string
+        }
+        Insert: {
+          content: string
+          conversation_id: string
+          created_at?: string
+          id?: string
+          message_type?: string
+          metadata?: Json | null
+          read_at?: string | null
+          sender_id: string
+          updated_at?: string
+        }
+        Update: {
+          content?: string
+          conversation_id?: string
+          created_at?: string
+          id?: string
+          message_type?: string
+          metadata?: Json | null
+          read_at?: string | null
+          sender_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "messages_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "messages_sender_id_fkey"
+            columns: ["sender_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+        ]
+      }
       mission_applications: {
         Row: {
           applicant_user_id: string
@@ -726,13 +968,6 @@ export type Database = {
             columns: ["mission_id"]
             isOneToOne: false
             referencedRelation: "missions"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "mission_applications_mission_id_fkey"
-            columns: ["mission_id"]
-            isOneToOne: false
-            referencedRelation: "public_mission_tracking"
             referencedColumns: ["id"]
           },
         ]
@@ -791,13 +1026,6 @@ export type Database = {
             referencedRelation: "missions"
             referencedColumns: ["id"]
           },
-          {
-            foreignKeyName: "mission_costs_mission_id_fkey"
-            columns: ["mission_id"]
-            isOneToOne: false
-            referencedRelation: "public_mission_tracking"
-            referencedColumns: ["id"]
-          },
         ]
       }
       mission_documents: {
@@ -840,13 +1068,6 @@ export type Database = {
             columns: ["mission_id"]
             isOneToOne: false
             referencedRelation: "missions"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "mission_documents_mission_id_fkey"
-            columns: ["mission_id"]
-            isOneToOne: false
-            referencedRelation: "public_mission_tracking"
             referencedColumns: ["id"]
           },
         ]
@@ -894,13 +1115,6 @@ export type Database = {
             columns: ["mission_id"]
             isOneToOne: false
             referencedRelation: "missions"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "mission_reports_mission_id_fkey"
-            columns: ["mission_id"]
-            isOneToOne: false
-            referencedRelation: "public_mission_tracking"
             referencedColumns: ["id"]
           },
         ]
@@ -959,7 +1173,6 @@ export type Database = {
           driver_earning: number | null
           driver_id: string | null
           id: string
-          kind: Database["public"]["Enums"]["mission_kind"] | null
           license_plate: string | null
           pickup_address: string | null
           pickup_contact_email: string | null
@@ -997,7 +1210,6 @@ export type Database = {
           driver_earning?: number | null
           driver_id?: string | null
           id?: string
-          kind?: Database["public"]["Enums"]["mission_kind"] | null
           license_plate?: string | null
           pickup_address?: string | null
           pickup_contact_email?: string | null
@@ -1035,7 +1247,6 @@ export type Database = {
           driver_earning?: number | null
           driver_id?: string | null
           id?: string
-          kind?: Database["public"]["Enums"]["mission_kind"] | null
           license_plate?: string | null
           pickup_address?: string | null
           pickup_contact_email?: string | null
@@ -1102,45 +1313,196 @@ export type Database = {
         }
         Relationships: []
       }
+      post_comments: {
+        Row: {
+          content: string
+          created_at: string | null
+          id: string
+          post_id: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          content: string
+          created_at?: string | null
+          id?: string
+          post_id: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          content?: string
+          created_at?: string | null
+          id?: string
+          post_id?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "post_comments_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "posts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      post_reactions: {
+        Row: {
+          created_at: string | null
+          id: string
+          post_id: string
+          reaction_type: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          post_id: string
+          reaction_type: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          post_id?: string
+          reaction_type?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "post_reactions_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "posts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      posts: {
+        Row: {
+          comments_count: number | null
+          content: string
+          created_at: string | null
+          dislikes_count: number | null
+          id: string
+          image_url: string | null
+          likes_count: number | null
+          shares_count: number | null
+          updated_at: string | null
+          user_id: string
+          video_url: string | null
+        }
+        Insert: {
+          comments_count?: number | null
+          content: string
+          created_at?: string | null
+          dislikes_count?: number | null
+          id?: string
+          image_url?: string | null
+          likes_count?: number | null
+          shares_count?: number | null
+          updated_at?: string | null
+          user_id: string
+          video_url?: string | null
+        }
+        Update: {
+          comments_count?: number | null
+          content?: string
+          created_at?: string | null
+          dislikes_count?: number | null
+          id?: string
+          image_url?: string | null
+          likes_count?: number | null
+          shares_count?: number | null
+          updated_at?: string | null
+          user_id?: string
+          video_url?: string | null
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
+          avatar_url: string | null
+          company_name: string | null
+          convoyeur_status: string | null
           created_at: string
+          driving_experience: number | null
+          driving_license: string | null
           email: string
           full_name: string
+          garage_document_url: string | null
           id: string
           is_verified: boolean | null
+          kbis_document_url: string | null
+          license_document_url: string | null
+          motivation: string | null
+          phone: string | null
           preferences: Json | null
+          siret: string | null
           status: Database["public"]["Enums"]["user_status"]
           updated_at: string
           user_id: string
+          user_type: string | null
+          vehicle_types: string | null
           verification_notes: string | null
           verification_status: string | null
+          vigilance_document_url: string | null
         }
         Insert: {
+          avatar_url?: string | null
+          company_name?: string | null
+          convoyeur_status?: string | null
           created_at?: string
+          driving_experience?: number | null
+          driving_license?: string | null
           email: string
           full_name: string
+          garage_document_url?: string | null
           id?: string
           is_verified?: boolean | null
+          kbis_document_url?: string | null
+          license_document_url?: string | null
+          motivation?: string | null
+          phone?: string | null
           preferences?: Json | null
+          siret?: string | null
           status?: Database["public"]["Enums"]["user_status"]
           updated_at?: string
           user_id: string
+          user_type?: string | null
+          vehicle_types?: string | null
           verification_notes?: string | null
           verification_status?: string | null
+          vigilance_document_url?: string | null
         }
         Update: {
+          avatar_url?: string | null
+          company_name?: string | null
+          convoyeur_status?: string | null
           created_at?: string
+          driving_experience?: number | null
+          driving_license?: string | null
           email?: string
           full_name?: string
+          garage_document_url?: string | null
           id?: string
           is_verified?: boolean | null
+          kbis_document_url?: string | null
+          license_document_url?: string | null
+          motivation?: string | null
+          phone?: string | null
           preferences?: Json | null
+          siret?: string | null
           status?: Database["public"]["Enums"]["user_status"]
           updated_at?: string
           user_id?: string
+          user_type?: string | null
+          vehicle_types?: string | null
           verification_notes?: string | null
           verification_status?: string | null
+          vigilance_document_url?: string | null
         }
         Relationships: []
       }
@@ -1583,6 +1945,7 @@ export type Database = {
           seats_available: number
           seats_total: number | null
           status: string | null
+          time: string | null
           to_city: string
           to_lat: number | null
           to_lng: number | null
@@ -1615,6 +1978,7 @@ export type Database = {
           seats_available: number
           seats_total?: number | null
           status?: string | null
+          time?: string | null
           to_city: string
           to_lat?: number | null
           to_lng?: number | null
@@ -1647,6 +2011,7 @@ export type Database = {
           seats_available?: number
           seats_total?: number | null
           status?: string | null
+          time?: string | null
           to_city?: string
           to_lat?: number | null
           to_lng?: number | null
@@ -1773,6 +2138,78 @@ export type Database = {
         }
         Relationships: []
       }
+      trending_topics: {
+        Row: {
+          hashtag: string
+          id: string
+          last_used: string | null
+          post_count: number | null
+        }
+        Insert: {
+          hashtag: string
+          id?: string
+          last_used?: string | null
+          post_count?: number | null
+        }
+        Update: {
+          hashtag?: string
+          id?: string
+          last_used?: string | null
+          post_count?: number | null
+        }
+        Relationships: []
+      }
+      user_connections: {
+        Row: {
+          created_at: string | null
+          follower_id: string
+          following_id: string
+          id: string
+          status: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          follower_id: string
+          following_id: string
+          id?: string
+          status?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          follower_id?: string
+          following_id?: string
+          id?: string
+          status?: string | null
+        }
+        Relationships: []
+      }
+      user_reviews: {
+        Row: {
+          comment: string | null
+          created_at: string
+          from_user_id: string
+          id: string
+          rating: number
+          to_user_id: string
+        }
+        Insert: {
+          comment?: string | null
+          created_at?: string
+          from_user_id: string
+          id?: string
+          rating: number
+          to_user_id: string
+        }
+        Update: {
+          comment?: string | null
+          created_at?: string
+          from_user_id?: string
+          id?: string
+          rating?: number
+          to_user_id?: string
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           assigned_at: string | null
@@ -1871,68 +2308,7 @@ export type Database = {
       }
     }
     Views: {
-      contacts_with_stats: {
-        Row: {
-          accepted_at: string | null
-          created_at: string | null
-          declined_at: string | null
-          email: string | null
-          id: string | null
-          invited_at: string | null
-          invited_user_id: string | null
-          missions_count: number | null
-          name: string | null
-          status: Database["public"]["Enums"]["contact_status"] | null
-          updated_at: string | null
-          user_id: string | null
-        }
-        Relationships: []
-      }
-      public_mission_tracking: {
-        Row: {
-          created_at: string | null
-          delivery_address: string | null
-          delivery_date: string | null
-          id: string | null
-          pickup_address: string | null
-          pickup_date: string | null
-          reference: string | null
-          status: string | null
-          title: string | null
-          updated_at: string | null
-          vehicle_brand: string | null
-          vehicle_model: string | null
-        }
-        Insert: {
-          created_at?: string | null
-          delivery_address?: string | null
-          delivery_date?: string | null
-          id?: string | null
-          pickup_address?: string | null
-          pickup_date?: string | null
-          reference?: string | null
-          status?: never
-          title?: string | null
-          updated_at?: string | null
-          vehicle_brand?: string | null
-          vehicle_model?: string | null
-        }
-        Update: {
-          created_at?: string | null
-          delivery_address?: string | null
-          delivery_date?: string | null
-          id?: string | null
-          pickup_address?: string | null
-          pickup_date?: string | null
-          reference?: string | null
-          status?: never
-          title?: string | null
-          updated_at?: string | null
-          vehicle_brand?: string | null
-          vehicle_model?: string | null
-        }
-        Relationships: []
-      }
+      [_ in never]: never
     }
     Functions: {
       add_contact: {
@@ -1991,6 +2367,23 @@ export type Database = {
         Args: { contact_user_id: string }
         Returns: number
       }
+      get_contacts_with_stats: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          accepted_at: string
+          created_at: string
+          declined_at: string
+          email: string
+          id: string
+          invited_at: string
+          invited_user_id: string
+          missions_count: number
+          name: string
+          status: Database["public"]["Enums"]["contact_status"]
+          updated_at: string
+          user_id: string
+        }[]
+      }
       get_mission_by_tracking_token: {
         Args: { tracking_token: string }
         Returns: {
@@ -2002,6 +2395,23 @@ export type Database = {
           reference: string
           status: string
           title: string
+          vehicle_brand: string
+          vehicle_model: string
+        }[]
+      }
+      get_trackable_missions: {
+        Args: { tracking_token?: string }
+        Returns: {
+          created_at: string
+          delivery_address: string
+          delivery_date: string
+          id: string
+          pickup_address: string
+          pickup_date: string
+          reference: string
+          status: string
+          title: string
+          updated_at: string
           vehicle_brand: string
           vehicle_model: string
         }[]
@@ -2076,6 +2486,7 @@ export type Database = {
           seats_available: number
           seats_total: number | null
           status: string | null
+          time: string | null
           to_city: string
           to_lat: number | null
           to_lng: number | null
@@ -2093,6 +2504,21 @@ export type Database = {
         }
         Returns: Json
       }
+      submit_convoyeur_application: {
+        Args: {
+          _company_name?: string
+          _driving_experience: number
+          _driving_license: string
+          _garage_url?: string
+          _kbis_url?: string
+          _license_url?: string
+          _motivation?: string
+          _siret?: string
+          _vehicle_types: string
+          _vigilance_url?: string
+        }
+        Returns: string
+      }
       transfer_credits: {
         Args: { _credits: number; _message?: string; _to_email: string }
         Returns: Json
@@ -2101,7 +2527,6 @@ export type Database = {
     Enums: {
       app_role: "admin" | "donneur_d_ordre" | "convoyeur"
       contact_status: "pending" | "accepted" | "declined" | "active"
-      mission_kind: "marketplace" | "inspection"
       mission_status: "pending" | "in_progress" | "completed" | "cancelled"
       mission_status_extended:
         | "pending"
@@ -2251,7 +2676,6 @@ export const Constants = {
     Enums: {
       app_role: ["admin", "donneur_d_ordre", "convoyeur"],
       contact_status: ["pending", "accepted", "declined", "active"],
-      mission_kind: ["marketplace", "inspection"],
       mission_status: ["pending", "in_progress", "completed", "cancelled"],
       mission_status_extended: [
         "pending",

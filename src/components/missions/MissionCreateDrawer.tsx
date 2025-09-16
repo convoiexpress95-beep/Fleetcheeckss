@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useMemo, useRef } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Mission } from '@/lib/mission-types';
-import { MissionForm, StepMeta, MissionFormValues } from './MissionForm';
+import { NewMissionForm, NewMissionStepMeta, NewMissionFormValues } from './NewMissionForm';
 import { MissionPrintSummary } from './MissionPrintSummary';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -28,28 +28,67 @@ import {
   Star
 } from 'lucide-react';
 
-interface Props { open:boolean; onClose:()=>void; onCreate:(m:Mission)=>void; }
-export const MissionCreateDrawer: React.FC<Props> = ({ open, onClose, onCreate }) => {
+interface Props { 
+  open: boolean; 
+  onClose: () => void; 
+  onCreate: (m: Mission) => void; 
+  preAssignedContact?: {
+    id: string;
+    name: string;
+    email: string;
+  } | null;
+}
+
+export const MissionCreateDrawer: React.FC<Props> = ({ open, onClose, onCreate, preAssignedContact }) => {
   const [step,setStep]=useState(1);
   const [highestVisited,setHighestVisited]=useState(1);
-  const [meta,setMeta]=useState<StepMeta[]>([]);
+  const [meta,setMeta]=useState<NewMissionStepMeta[]>([]);
   const [sidebarOpen,setSidebarOpen]=useState(false);
   const [previewOpen,setPreviewOpen]=useState(false);
-  const [latestValues,setLatestValues]=useState<MissionFormValues|undefined>(undefined);
+  const [latestValues,setLatestValues]=useState<NewMissionFormValues|undefined>(undefined);
   const [savedDraft, setSavedDraft] = useState(false);
+  
+  // Stable refs to prevent Radix UI loops
+  const openRef = useRef(open);
+  const onCloseRef = useRef(onClose);
+  const onCreateRef = useRef(onCreate);
+  
+  // Update refs when props change
+  React.useEffect(() => {
+    openRef.current = open;
+    onCloseRef.current = onClose;
+    onCreateRef.current = onCreate;
+  }, [open, onClose, onCreate]);
+  
+  // Valeurs initiales basées sur le contact pré-assigné
+  const initialValues = useMemo(() => {
+    if (!preAssignedContact) return undefined;
+    return {
+      assignedDriver: preAssignedContact.name
+    };
+  }, [preAssignedContact]);
   
   const dirty = useMemo(()=>{
     if(!latestValues) return false;
     try {
-      const { clientName, clientContact, vehicle } = latestValues;
-      if(clientName || clientContact?.name || clientContact?.email || vehicle?.licensePlate) return true;
+      const { clientName, vehicle } = latestValues;
+      if(clientName || vehicle?.brand || vehicle?.licensePlate) return true;
       return false;
     } catch { return false; }
   },[latestValues]);
   
   const totalSteps=5;
   const onSetStep=useCallback((n:number)=>{ setStep(n); setHighestVisited(h=> n>h? n : h); },[]);
-  const close=()=>{ onClose(); };
+  
+  // Use stable callbacks
+  const close = useCallback(() => { 
+    if (onCloseRef.current) onCloseRef.current(); 
+  }, []);
+  
+  const onSubmitMission = useCallback((m: Mission) => { 
+    if (onCreateRef.current) onCreateRef.current(m); 
+    close(); 
+  }, [close]);
   
   // Enhanced auto-save functionality with premium feedback
   React.useEffect(() => {
@@ -109,23 +148,40 @@ export const MissionCreateDrawer: React.FC<Props> = ({ open, onClose, onCreate }
   };
   
   const confirmingRef = useRef(false);
-  const requestClose = () => {
-    if(dirty){
-      if(confirmingRef.current) return;
+  const requestClose = useCallback(() => {
+    // Cette fonction est maintenant utilisée uniquement par les boutons de fermeture internes
+    if(!dirty){
+      if (onCloseRef.current) onCloseRef.current();
+      return;
+    }
+    if(confirmingRef.current) return;
+    confirmingRef.current = true;
+    const ok = window.confirm('Vous avez un brouillon non enregistré. Fermer quand même ?');
+    confirmingRef.current = false;
+    if(ok) {
+      if (onCloseRef.current) onCloseRef.current();
+    }
+  }, [dirty]);
+  
+  const handleOpenChange = useCallback((next:boolean) => {
+    // Si on essaie de fermer le dialog
+    if(!next && openRef.current){
+      // Si pas de modifications, fermer directement
+      if(!dirty){
+        if (onCloseRef.current) onCloseRef.current();
+        return;
+      }
+      // Si des modifications, demander confirmation
+      if(confirmingRef.current) return; // Éviter les boucles
       confirmingRef.current = true;
       const ok = window.confirm('Vous avez un brouillon non enregistré. Fermer quand même ?');
       confirmingRef.current = false;
-      if(!ok) return;
+      if(ok) {
+        if (onCloseRef.current) onCloseRef.current();
+      }
+      // Si l'utilisateur annule, ne rien faire (le dialog reste ouvert)
     }
-    close();
-  };
-  
-  const handleOpenChange = (next:boolean) => {
-    if(!next && open){
-      requestClose();
-      return;
-    }
-  };
+  }, [dirty]);
   
   React.useEffect(()=>{
     if(!open){
@@ -253,7 +309,7 @@ export const MissionCreateDrawer: React.FC<Props> = ({ open, onClose, onCreate }
               {Array.from({length:totalSteps},(_,i)=>{
                 const s=i+1; 
                 const mItem=meta.find(mm=>mm.step===s); 
-                const missing=mItem?.missing.length||0;
+                const missing = 0; // Simplifié pour l'instant
                 const visited = highestVisited>=s;
                 const active = s===step;
                 const complete = visited && missing===0 && s!==step;
@@ -383,15 +439,16 @@ export const MissionCreateDrawer: React.FC<Props> = ({ open, onClose, onCreate }
 
             {/* Form Content */}
             <div className="flex-1 overflow-y-auto px-6 py-6 lg:py-8">
-              <MissionForm 
+              <NewMissionForm 
                 step={step} 
                 setStep={onSetStep} 
-                onSubmitMission={(m)=>{ onCreate(m); close(); }} 
+                onSubmitMission={onSubmitMission}
                 close={close} 
                 totalSteps={totalSteps} 
                 onStepMeta={setMeta} 
                 highestVisited={highestVisited} 
-                onValuesChange={setLatestValues} 
+                onValuesChange={setLatestValues}
+                initialValues={initialValues}
               />
             </div>
 
@@ -441,14 +498,14 @@ export const MissionCreateDrawer: React.FC<Props> = ({ open, onClose, onCreate }
                     <div className="grid md:grid-cols-2 gap-8 text-sm">
                       <section>
                         <h2 className="text-lg font-semibold text-gray-900 mb-3 flex items-center gap-2">
-                          <User className="w-5 h-5 text-cyan-600" />
-                          Informations Client
+                          <FileText className="w-5 h-5 text-cyan-600" />
+                          Informations Mission
                         </h2>
                         <div className="bg-gray-50 rounded-lg p-4 space-y-2">
-                          <p><strong>Nom :</strong> {latestValues.clientName||'Non défini'}</p>
+                          <p><strong>Client :</strong> {latestValues.clientName||'Non défini'}</p>
                           <p><strong>Contact :</strong> {latestValues.clientContact?.name || 'Non défini'}</p>
-                          <p><strong>Email :</strong> {latestValues.clientContact?.email || 'Non défini'}</p>
-                          <p><strong>Téléphone :</strong> {latestValues.clientContact?.phone || 'Non défini'}</p>
+                          <p><strong>Catégorie :</strong> {latestValues.vehicle?.category || 'Non définie'}</p>
+                          <p><strong>Départ prévu :</strong> {latestValues.departure?.date || 'Non défini'}</p>
                         </div>
                       </section>
 
@@ -459,9 +516,12 @@ export const MissionCreateDrawer: React.FC<Props> = ({ open, onClose, onCreate }
                         </h2>
                         <div className="bg-gray-50 rounded-lg p-4 space-y-2">
                           <p><strong>Véhicule :</strong> {latestValues.vehicle?.brand || 'Non défini'} {latestValues.vehicle?.model || ''}</p>
-                          <p><strong>Plaque :</strong> {latestValues.vehicle?.licensePlate || 'Non défini'}</p>
-                          <p><strong>Type :</strong> {latestValues.vehicle?.category || 'Non défini'}</p>
-                          <p><strong>Énergie :</strong> {latestValues.vehicle?.energy || 'Non défini'}</p>
+                          <p><strong>Plaque :</strong> {latestValues.vehicle?.licensePlate || 'Non définie'}</p>
+                          {latestValues.vehicle?.image && (
+                            <div className="mt-2">
+                              <img src={latestValues.vehicle.image} alt="Véhicule" className="w-20 h-12 object-cover rounded" />
+                            </div>
+                          )}
                         </div>
                       </section>
 
@@ -471,10 +531,9 @@ export const MissionCreateDrawer: React.FC<Props> = ({ open, onClose, onCreate }
                           Départ
                         </h2>
                         <div className="bg-gray-50 rounded-lg p-4 space-y-2">
-                          <p><strong>Adresse :</strong> {latestValues.departure?.address?.street || 'Non défini'}</p>
-                          <p><strong>Ville :</strong> {latestValues.departure?.address?.postalCode || ''} {latestValues.departure?.address?.city || 'Non défini'}</p>
-                          <p><strong>Date :</strong> {latestValues.departure?.date || 'Non défini'}</p>
-                          <p><strong>Créneau :</strong> {latestValues.departure?.timeSlot || 'Non défini'}</p>
+                          <p><strong>Adresse :</strong> {latestValues.departure?.address?.street || 'Non définie'}</p>
+                          <p><strong>Ville :</strong> {latestValues.departure?.address?.postalCode || ''} {latestValues.departure?.address?.city || 'Non définie'}</p>
+                          <p><strong>Contact :</strong> {latestValues.departure?.contact?.phone || 'Non défini'}</p>
                         </div>
                       </section>
 
@@ -484,26 +543,25 @@ export const MissionCreateDrawer: React.FC<Props> = ({ open, onClose, onCreate }
                           Arrivée
                         </h2>
                         <div className="bg-gray-50 rounded-lg p-4 space-y-2">
-                          <p><strong>Adresse :</strong> {latestValues.arrival?.address?.street || 'Non défini'}</p>
-                          <p><strong>Ville :</strong> {latestValues.arrival?.address?.postalCode || ''} {latestValues.arrival?.address?.city || 'Non défini'}</p>
-                          <p><strong>Date :</strong> {latestValues.arrival?.expectedDate || 'Non défini'}</p>
-                          <p><strong>Créneau :</strong> {latestValues.arrival?.timeSlot || 'Non défini'}</p>
+                          <p><strong>Adresse :</strong> {latestValues.arrival?.address?.street || 'Non définie'}</p>
+                          <p><strong>Ville :</strong> {latestValues.arrival?.address?.postalCode || ''} {latestValues.arrival?.address?.city || 'Non définie'}</p>
+                          <p><strong>Contact :</strong> {latestValues.arrival?.contact?.phone || 'Non défini'}</p>
                         </div>
                       </section>
                     </div>
 
                     <section className="mt-8">
                       <h2 className="text-lg font-semibold text-gray-900 mb-3 flex items-center gap-2">
-                        <Settings className="w-5 h-5 text-purple-600" />
-                        Options & Priorité
+                        <User className="w-5 h-5 text-purple-600" />
+                        Assignation & Options
                       </h2>
                       <div className="bg-gray-50 rounded-lg p-4">
+                        <p><strong>Assigné à :</strong> {latestValues.assignedDriver || 'Non assigné'}</p>
                         <p><strong>Priorité :</strong> {latestValues.priority || 'Normale'}</p>
                         <div className="mt-2 flex flex-wrap gap-2">
                           {latestValues.options?.gpsTracking && <Badge className="bg-green-100 text-green-800">Suivi GPS</Badge>}
                           {latestValues.options?.departureInspection && <Badge className="bg-blue-100 text-blue-800">Inspection départ</Badge>}
                           {latestValues.options?.arrivalInspection && <Badge className="bg-blue-100 text-blue-800">Inspection arrivée</Badge>}
-                          {latestValues.options?.roundTrip && <Badge className="bg-orange-100 text-orange-800">Aller-retour</Badge>}
                         </div>
                       </div>
                     </section>
@@ -567,38 +625,38 @@ function getStepColor(step: number, active: boolean, complete: boolean, error: b
 
 function stepTitle(step:number){
   switch(step){
-    case 1: return 'Client & Contact';
+    case 1: return 'Infos Mission';
     case 2: return 'Véhicule';
-    case 3: return 'Itinéraire';
-    case 4: return 'Options';
-    case 5: return 'Notes & PJ';
+    case 3: return 'Trajet';
+    case 4: return 'Assignation';
+    case 5: return 'Confirmation';
     default: return `Étape ${step}`;
   }
 }
 
-function computePercent(meta:StepMeta[], total:number){
+function computePercent(meta:NewMissionStepMeta[], total:number){
   if(!meta.length) return 0;
-  const completed = meta.filter(m=>m.missing.length===0).length;
+  const completed = meta.filter(m=>m.isComplete).length;
   return Math.min(100, Math.round((completed/total)*100));
 }
 
-function handlePrint(values?:MissionFormValues){
+function handlePrint(values?:NewMissionFormValues){
   if(!values) return;
   const win = window.open('', '_blank','noopener,noreferrer,width=900,height=1200');
   if(!win) return;
   const doc = win.document;
   doc.write(`<!DOCTYPE html><html lang="fr"><head><meta charset="utf-8"/><title>Résumé mission</title><style>${printStyles()}</style></head><body>`);
   doc.write(`<h1>Résumé mission (brouillon)</h1>`);
-  doc.write(`<div class="section"><h2>Client</h2><p><strong>${escapeHtml(values.clientName)}</strong><br/>${escapeHtml(values.clientContact.name)} • ${escapeHtml(values.clientContact.email)} • ${escapeHtml(values.clientContact.phone)}</p></div>`);
-  doc.write(`<div class="section"><h2>Véhicule</h2><p>${escapeHtml(values.vehicle.brand)} ${escapeHtml(values.vehicle.model)} — ${escapeHtml(values.vehicle.licensePlate)}<br/><span class="muted">${values.vehicle.category} • ${values.vehicle.energy}</span></p></div>`);
+  doc.write(`<div class="section"><h2>Mission</h2><p><strong>${escapeHtml(values.clientName)}</strong><br/>Catégorie: ${values.vehicle.category}</p></div>`);
+  doc.write(`<div class="section"><h2>Véhicule</h2><p>${escapeHtml(values.vehicle.brand)} ${escapeHtml(values.vehicle.model)} — ${escapeHtml(values.vehicle.licensePlate)}</p></div>`);
   doc.write(`<div class="grid">`);
-  doc.write(`<div><h3>Départ</h3><p>${escapeHtml(values.departure.address.street)}<br/>${escapeHtml(values.departure.address.postalCode)} ${escapeHtml(values.departure.address.city)} (${escapeHtml(values.departure.address.country)})<br/>${escapeHtml(values.departure.date)} ${escapeHtml(values.departure.timeSlot)}<br/><span class="muted">${escapeHtml(values.departure.contact.name)} • ${escapeHtml(values.departure.contact.email)} • ${escapeHtml(values.departure.contact.phone)}</span></p></div>`);
-  doc.write(`<div><h3>Arrivée</h3><p>${escapeHtml(values.arrival.address.street)}<br/>${escapeHtml(values.arrival.address.postalCode)} ${escapeHtml(values.arrival.address.city)} (${escapeHtml(values.arrival.address.country)})<br/>${escapeHtml(values.arrival.expectedDate)} ${escapeHtml(values.arrival.timeSlot)}<br/><span class="muted">${escapeHtml(values.arrival.contact.name)} • ${escapeHtml(values.arrival.contact.email)} • ${escapeHtml(values.arrival.contact.phone)}</span></p></div>`);
+  doc.write(`<div><h3>Départ</h3><p>${escapeHtml(values.departure.address.street)}<br/>${escapeHtml(values.departure.address.postalCode)} ${escapeHtml(values.departure.address.city)} (${escapeHtml(values.departure.address.country)})<br/>Contact: ${escapeHtml(values.departure.contact.phone)}</p></div>`);
+  doc.write(`<div><h3>Arrivée</h3><p>${escapeHtml(values.arrival.address.street)}<br/>${escapeHtml(values.arrival.address.postalCode)} ${escapeHtml(values.arrival.address.city)} (${escapeHtml(values.arrival.address.country)})<br/>Contact: ${escapeHtml(values.arrival.contact.phone)}</p></div>`);
   doc.write(`</div>`);
-  doc.write(`<div class="section"><h2>Options & priorité</h2><p>Priorité: ${values.priority}<br/><span class="muted">GPS: ${values.options.gpsTracking?'Oui':'Non'} | Insp. départ: ${values.options.departureInspection?'Oui':'Non'} | Insp. arrivée: ${values.options.arrivalInspection?'Oui':'Non'} | Aller-retour: ${values.options.roundTrip?'Oui':'Non'}</span></p></div>`);
-  if(values.driverName){ doc.write(`<div class="section"><h2>Affectation</h2><p>${escapeHtml(values.driverName)}</p></div>`); }
+  doc.write(`<div class="section"><h2>Options & priorité</h2><p>Priorité: ${values.priority}<br/><span class="muted">GPS: ${values.options.gpsTracking?'Oui':'Non'} | Insp. départ: ${values.options.departureInspection?'Oui':'Non'} | Insp. arrivée: ${values.options.arrivalInspection?'Oui':'Non'}</span></p></div>`);
+  if(values.assignedDriver){ doc.write(`<div class="section"><h2>Affectation</h2><p>${escapeHtml(values.assignedDriver)}</p></div>`); }
   if(values.notes){ doc.write(`<div class="section"><h2>Notes</h2><pre class="notes">${escapeHtml(values.notes)}</pre></div>`); }
-  if(values.attachments?.length){ doc.write(`<div class="section"><h2>Pièces jointes</h2><ul>${values.attachments.map(a=>`<li>${escapeHtml(a)}</li>`).join('')}</ul></div>`); }
+  if(values.attachments?.length){ doc.write(`<div class="section"><h2>Documents attachés</h2><ul>${values.attachments.map(a=>`<li>${escapeHtml(a)}</li>`).join('')}</ul></div>`); }
   doc.write(`<footer>Généré le ${new Date().toLocaleString()}</footer>`);
   doc.write(`<script>window.onload=()=>{ window.print(); };</script>`);
   doc.write(`</body></html>`);

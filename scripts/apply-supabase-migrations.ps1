@@ -5,7 +5,8 @@ param(
   [ValidateSet('disable','allow','prefer','require','verify-ca','verify-full')] [string]$SslMode = "require",
   [string]$WorkspaceRoot = $(if ($PSScriptRoot) { Split-Path -Parent $PSScriptRoot } else { (Get-Location).Path }),
   [switch]$MakeBucketPublic,
-  [string[]]$OnlyThese
+  [string[]]$OnlyThese,
+  [string]$Password
 )
 
 function Write-Section($text) { Write-Host "`n=== $text ===" -ForegroundColor Cyan }
@@ -18,15 +19,20 @@ $psql = Get-Command psql -ErrorAction SilentlyContinue
 if (-not $psql) { Write-Err "psql introuvable. Installe PostgreSQL client et/ou ajoute psql au PATH."; exit 1 }
 
 if (-not $env:PGPASSWORD) {
-  Write-Warn "PGPASSWORD non défini dans cette session. Il sera demandé une fois (non affiché)."
-  $secure = Read-Host "Mot de passe DB ($User@$Host)" -AsSecureString
-  try {
-    $bstr = [System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($secure)
-    $plain = [System.Runtime.InteropServices.Marshal]::PtrToStringBSTR($bstr)
-  } finally {
-    if ($bstr) { [System.Runtime.InteropServices.Marshal]::ZeroFreeBSTR($bstr) }
+  if ($Password) {
+    # Utilise le mot de passe passé en paramètre (attention: visible dans l'historique de commande)
+    $env:PGPASSWORD = $Password
+  } else {
+    Write-Warn "PGPASSWORD non défini dans cette session. Il sera demandé une fois (non affiché)."
+    $secure = Read-Host "Mot de passe DB ($User@$DbHost)" -AsSecureString
+    try {
+      $bstr = [System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($secure)
+      $plain = [System.Runtime.InteropServices.Marshal]::PtrToStringBSTR($bstr)
+    } finally {
+      if ($bstr) { [System.Runtime.InteropServices.Marshal]::ZeroFreeBSTR($bstr) }
+    }
+    $env:PGPASSWORD = $plain
   }
-  $env:PGPASSWORD = $plain
 }
 
 $Conn = "host=$DbHost port=5432 dbname=$DbName user=$User sslmode=$SslMode"
@@ -45,7 +51,8 @@ if ($OnlyThese -and $OnlyThese.Count -gt 0) {
   }
 } else {
   $files = Get-ChildItem -Path $migrationsDir -Filter *.sql -Recurse |
-           Where-Object { $_.FullName -notmatch "\\_hold(\\|$)" } |
+           # Exclure les sous-dossiers nommés _hold (regex: début ou antislash, puis _hold, puis antislash ou fin)
+           Where-Object { $_.FullName -notmatch '(^|\\)_hold(\\|$)' } |
            Sort-Object Name |
            Select-Object -ExpandProperty FullName
 }

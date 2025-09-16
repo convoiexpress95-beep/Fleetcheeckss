@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { ShoppingCart, CreditCard, Clock, CheckCircle, Star, Shield, Calendar } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
-import { useToast } from '@/hooks/use-toast';
+import { useToast } from '@/components/ui/use-toast';
 import { useSearchParams } from 'react-router-dom';
 
 const Shop = () => {
@@ -192,13 +192,8 @@ const Shop = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-purple-900/20 to-blue-900/30 relative overflow-hidden">
-      {/* Background Effects */}
-      <div className="absolute inset-0 bg-gradient-aurora opacity-5"></div>
-      <div className="absolute top-0 right-1/4 w-96 h-96 bg-gradient-cosmic rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-float"></div>
-      <div className="absolute bottom-0 left-1/4 w-96 h-96 bg-gradient-sunset rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-float animation-delay-2000"></div>
-      
-      <div className="container mx-auto px-4 py-8 relative z-10">
+    <div className="">
+      <div className="container mx-auto px-4 py-8">
         {/* Header */}
         <div className="flex items-center gap-4 mb-8 animate-fade-in-up">
           <div className="p-3 bg-gradient-cosmic rounded-2xl glow animate-pulse-glow">

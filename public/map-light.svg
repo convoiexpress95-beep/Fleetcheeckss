@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="800" height="600" viewBox="0 0 800 600" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0%" stop-color="#E0F2FE"/>
+      <stop offset="100%" stop-color="#CFFAFE"/>
+    </linearGradient>
+    <filter id="noise">
+      <feTurbulence type="fractalNoise" baseFrequency="0.8" numOctaves="1" stitchTiles="stitch"/>
+      <feColorMatrix type="saturate" values="0"/>
+      <feComponentTransfer>
+        <feFuncA type="table" tableValues="0 0.05"/>
+      </feComponentTransfer>
+    </filter>
+  </defs>
+  <rect width="100%" height="100%" fill="url(#bg)"/>
+  <!-- subtle paper noise -->
+  <rect width="100%" height="100%" filter="url(#noise)" opacity="0.08" />
+  <!-- light land patches -->
+  <g stroke="#BAE6FD" stroke-width="2" opacity="0.5">
+    <path d="M50,120 C120,100 180,160 260,140" fill="none"/>
+    <path d="M140,220 C210,210 300,260 360,230" fill="none"/>
+    <path d="M420,90 C500,120 580,80 650,110" fill="none"/>
+    <path d="M90,360 C200,340 300,380 420,360" fill="none"/>
+    <path d="M500,320 C560,330 620,360 700,340" fill="none"/>
+  </g>
+  <!-- rivers -->
+  <g stroke="#67E8F9" stroke-width="3" opacity="0.3">
+    <path d="M80,40 C140,100 100,180 160,240 C220,300 180,360 240,420" fill="none"/>
+    <path d="M600,60 C560,120 640,180 600,240 C560,300 640,360 600,420" fill="none"/>
+  </g>
+  <!-- small city dots -->
+  <g fill="#0EA5E9" opacity="0.35">
+    <circle cx="120" cy="150" r="3"/>
+    <circle cx="230" cy="180" r="3"/>
+    <circle cx="310" cy="120" r="3"/>
+    <circle cx="520" cy="170" r="3"/>
+    <circle cx="640" cy="200" r="3"/>
+    <circle cx="720" cy="140" r="3"/>
+    <circle cx="420" cy="280" r="3"/>
+    <circle cx="260" cy="330" r="3"/>
+    <circle cx="540" cy="360" r="3"/>
+  </g>
+</svg>

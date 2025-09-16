@@ -8,7 +8,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Plus, Trash2, FileText, Search } from 'lucide-react';
 import { useBilling, type Client, type InvoiceItem } from '@/hooks/useBilling';
-import { toast } from '@/hooks/use-toast';
+import { useToast } from '@/hooks';
 
 interface CreateInvoiceDialogProps {
   trigger?: React.ReactNode;
@@ -19,6 +19,7 @@ export const CreateInvoiceDialog: React.FC<CreateInvoiceDialogProps> = ({
   trigger,
   onInvoiceCreated
 }) => {
+  const { toast } = useToast();
   const { clients, createInvoice, addInvoiceItems, validateSiret, saveClient, loading } = useBilling();
   const [open, setOpen] = useState(false);
   const [step, setStep] = useState<'client' | 'details' | 'items'>('client');

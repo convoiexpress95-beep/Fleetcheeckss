@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-import { toast } from '@/hooks/use-toast';
+import { useToast } from '@/hooks';
 
 export interface CompanyInfo {
   id?: string;
@@ -95,6 +95,7 @@ export interface Quote {
 }
 
 export const useBilling = () => {
+  const { toast } = useToast();
   const { user } = useAuth();
   const [loading, setLoading] = useState(false);
   const [companyInfo, setCompanyInfo] = useState<CompanyInfo | null>(null);

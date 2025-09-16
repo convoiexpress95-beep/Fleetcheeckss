@@ -6,7 +6,7 @@ import { useRealTimeTracking } from '@/hooks/useRealTimeTracking';
 import { MapboxMap } from '@/components/MapboxMap';
 import { NativeMissionTracking } from '@/components/NativeMissionTracking';
 import { supabase } from '@/integrations/supabase/client';
-import { useToast } from '@/hooks/use-toast';
+import { useToast } from '@/hooks';
 import { 
   MapPin, 
   Navigation, 
@@ -25,7 +25,6 @@ import {
   AlertCircle,
   Loader2
 } from 'lucide-react';
-import { ToastAction } from '@/components/ui/toast';
 
 export default function Tracking() {
   const { missions, loading, error, updateMissionStatus, calculateETA } = useRealTimeTracking();
@@ -99,9 +98,6 @@ export default function Tracking() {
           <span>
             Lien copié. <a href={trackingUrl} target="_blank" rel="noreferrer" className="underline">Ouvrir</a>
           </span>
-        ),
-        action: (
-          <ToastAction altText="Ouvrir" onClick={() => window.open(trackingUrl, '_blank')}>Ouvrir</ToastAction>
         )
       });
     } catch (error) {
@@ -198,10 +194,10 @@ export default function Tracking() {
               ) : (
                 <div className="space-y-2 max-h-[calc(100vh-280px)] overflow-y-auto pr-1">
                   {missions.map((mission) => (
-                    <button
+                    <div
                       key={mission.id}
                       onClick={() => setSelectedMission(mission.id)}
-                      className={`w-full text-left p-3 rounded-lg border transition hover:bg-accent/10 ${
+                      className={`w-full text-left p-3 rounded-lg border transition hover:bg-accent/10 cursor-pointer ${
                         selectedMission === mission.id ? 'border-primary bg-primary/5' : 'border-border'
                       }`}
                     >
@@ -239,7 +235,7 @@ export default function Tracking() {
                           </Button>
                         </div>
                       </div>
-                    </button>
+                    </div>
                   ))}
                 </div>
               )}

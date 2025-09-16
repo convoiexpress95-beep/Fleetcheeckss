@@ -8,10 +8,12 @@ import { Separator } from "@/components/ui/separator";
 import { Send, MessageCircle, Euro, AlertTriangle, Download, FileText } from "lucide-react";
 import type { Database } from "@/integrations/supabase/types.extended";
 import { supabase } from "@/integrations/supabase/client";
-import { useToast } from "@/hooks/use-toast";
+import { useToast } from "@/hooks";
 import { formatDistanceToNow } from "date-fns";
 import { fr } from "date-fns/locale";
 import FileUploadButton from "./FileUploadButton";
+import { useWallet } from '@/hooks/useWallet';
+import { Link } from 'react-router-dom';
 
 type BaseMessageMetadata = {
   attachment_url?: string;
@@ -50,6 +52,7 @@ interface MessagingInterfaceProps {
 }
 
 const MessagingInterface = ({ userId, userRole }: MessagingInterfaceProps) => {
+  const { balance, isConvoyeurConfirme } = useWallet();
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [selectedConversation, setSelectedConversation] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -71,7 +74,7 @@ const MessagingInterface = ({ userId, userRole }: MessagingInterfaceProps) => {
 
   const fetchConversations = useCallback(async () => {
     try {
-      const { data, error } = await supabase
+  const { data, error } = await (supabase as any)
         .from('conversations')
         .select(`*`)
         .or(`owner_id.eq.${userId},convoyeur_id.eq.${userId}`)
@@ -105,7 +108,7 @@ const MessagingInterface = ({ userId, userRole }: MessagingInterfaceProps) => {
 
   const fetchMessages = useCallback(async (conversationId: string) => {
     try {
-      const { data, error } = await supabase
+  const { data, error } = await (supabase as any)
         .from('messages')
         .select(`
           *,
@@ -152,7 +155,7 @@ const MessagingInterface = ({ userId, userRole }: MessagingInterfaceProps) => {
 
   const markMessagesAsRead = useCallback(async (conversationId: string) => {
     try {
-      await supabase
+  await (supabase as any)
         .from('messages')
         .update({ read_at: new Date().toISOString() })
         .eq('conversation_id', conversationId)
@@ -166,6 +169,12 @@ const MessagingInterface = ({ userId, userRole }: MessagingInterfaceProps) => {
   type MessageInsert = Database['public']['Tables']['messages']['Insert'];
   const sendMessage = useCallback(async () => {
     if ((!newMessage.trim() && !attachmentUrl) || !selectedConversation) return;
+
+    // Garde côté client: si convoyeur confirmé, exiger >= 5 crédits
+    if (isConvoyeurConfirme && balance < 5) {
+      toast({ title: 'Crédits insuffisants', description: 'Vous devez avoir au moins 5 crédits pour envoyer un message.', variant: 'destructive' });
+      return;
+    }
 
     setSendingMessage(true);
 
@@ -185,7 +194,7 @@ const MessagingInterface = ({ userId, userRole }: MessagingInterfaceProps) => {
         messageData.metadata = meta as unknown as MessageInsert['metadata'];
       }
 
-      const { error } = await supabase
+  const { error } = await (supabase as any)
         .from('messages')
         .insert(messageData);
 
@@ -206,7 +215,7 @@ const MessagingInterface = ({ userId, userRole }: MessagingInterfaceProps) => {
     } finally {
       setSendingMessage(false);
     }
-  }, [newMessage, attachmentUrl, attachmentName, selectedConversation, userId, fetchMessages, fetchConversations, toast]);
+  }, [newMessage, attachmentUrl, attachmentName, selectedConversation, userId, fetchMessages, fetchConversations, toast, isConvoyeurConfirme, balance]);
 
   // Effects après définition des callbacks
   // Effets uniques (fetch + scroll)
@@ -433,6 +442,12 @@ const MessagingInterface = ({ userId, userRole }: MessagingInterfaceProps) => {
 
               {/* Zone de saisie */}
               <div className="p-4">
+                {isConvoyeurConfirme && balance < 5 && (
+                  <div className="mb-3 p-2 text-sm rounded border border-yellow-300 bg-yellow-50 text-yellow-800">
+                    Vous êtes convoyeur confirmé. Il vous faut au moins 5 crédits pour écrire (solde actuel: {balance}).
+                    <Link to="/verification" className="ml-2 underline font-medium">Vérifier mon profil</Link>
+                  </div>
+                )}
                 {(attachmentUrl || attachmentName) && (
                   <div className="mb-2 p-2 bg-blue-50 dark:bg-blue-950 rounded-lg border border-blue-200 dark:border-blue-800">
                     <div className="flex items-center gap-2 text-sm">
@@ -466,7 +481,7 @@ const MessagingInterface = ({ userId, userRole }: MessagingInterfaceProps) => {
                   />
                   <Button
                     onClick={sendMessage}
-                    disabled={sendingMessage || (!newMessage.trim() && !attachmentUrl)}
+                    disabled={sendingMessage || (!newMessage.trim() && !attachmentUrl) || (isConvoyeurConfirme && balance < 5)}
                   >
                     <Send className="w-4 h-4" />
                   </Button>

@@ -1,0 +1,12 @@
+{
+  "AA": { "brand": "Renault", "models": ["Clio", "Megane", "Captur"] },
+  "AB": { "brand": "Peugeot", "models": ["208", "308", "3008"] },
+  "AC": { "brand": "Citroën", "models": ["C3", "C4", "Berlingo"] },
+  "AD": { "brand": "Tesla", "models": ["Model 3", "Model Y", "Model S"] },
+  "AE": { "brand": "BMW", "models": ["X1", "Serie 1", "i3"] },
+  "AF": { "brand": "Mercedes", "models": ["Classe A", "GLA", "eSprinter"] },
+  "AG": { "brand": "Audi", "models": ["A3", "Q4", "e-tron"] },
+  "AH": { "brand": "Volkswagen", "models": ["Golf", "ID.3", "Transporter"] },
+  "AI": { "brand": "Toyota", "models": ["Yaris", "Corolla", "Proace"] },
+  "AJ": { "brand": "Ford", "models": ["Focus", "Transit", "Kuga"] }
+}

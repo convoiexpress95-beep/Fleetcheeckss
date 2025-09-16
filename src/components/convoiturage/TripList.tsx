@@ -1,6 +1,6 @@
 import { TripCard, Trip } from "@/components/convoiturage/TripCard";
 import { useConvoiturage, type SearchParams } from "@/hooks/useConvoiturage";
-import { useToast } from "@/hooks/use-toast";
+import { useToast } from "@/hooks";
 
 export function TripList({ filters }: { filters?: SearchParams }) {
   const { rides, loading, reserveRide } = useConvoiturage(filters);

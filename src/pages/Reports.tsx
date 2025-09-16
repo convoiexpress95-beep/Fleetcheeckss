@@ -254,7 +254,7 @@ const Reports = () => {
 
   return (
     <>
-    <div className="min-h-screen bg-gradient-to-br from-background to-background/80 p-6">
+    <div className="p-6">
       <div className="max-w-4xl mx-auto space-y-6">
         <div className="flex items-center gap-3">
           <div className="w-12 h-12 bg-gradient-royal rounded-xl flex items-center justify-center shadow-lg shadow-primary/20">
@@ -327,13 +327,13 @@ const Reports = () => {
                       </div>
                     </div>
                     <div className="flex items-center gap-2 flex-wrap justify-end">
-                      <Button size="sm" variant="default" className="bg-blue-600 hover:bg-blue-700" onClick={() => openFullReport(m)} disabled={busyId===m.id}>
+                      <Button size="sm" variant="default" className="bg-cyan-600 hover:bg-cyan-700" onClick={() => openFullReport(m)} disabled={busyId===m.id}>
                         <Eye className="w-4 h-4 mr-1" /> Voir
                       </Button>
-                      <Button size="sm" variant="secondary" className="bg-emerald-600 text-white hover:bg-emerald-700" onClick={() => emailFullReport(m)} disabled={busyId===m.id}>
+                      <Button size="sm" variant="secondary" className="bg-teal-600 text-white hover:bg-teal-700" onClick={() => emailFullReport(m)} disabled={busyId===m.id}>
                         <Mail className="w-4 h-4 mr-1" /> Email
                       </Button>
-                      <Button size="sm" className="bg-indigo-600 hover:bg-indigo-700" onClick={() => downloadZip(m)} disabled={busyId===m.id} title="Télécharger toutes les photos (PDF)">
+                      <Button size="sm" className="bg-cyan-600 hover:bg-cyan-700" onClick={() => downloadZip(m)} disabled={busyId===m.id} title="Télécharger toutes les photos (PDF)">
                         <Download className="w-4 h-4 mr-1" /> Tout (PDF)
                       </Button>
                     </div>
@@ -353,7 +353,7 @@ const Reports = () => {
           <div className="w-full max-w-3xl bg-card border border-border/60 rounded-xl shadow-2xl overflow-hidden">
             <div className="flex items-center justify-between px-4 py-3 border-b border-border/60">
               <div className="font-semibold">Rapport complet</div>
-              <button className="p-1 rounded hover:bg-muted/30" onClick={closeFullReport} aria-label="Fermer">
+              <button className="p-1 rounded hover:bg-cyan-500/30" onClick={closeFullReport} aria-label="Fermer">
                 <X className="w-5 h-5" />
               </button>
             </div>

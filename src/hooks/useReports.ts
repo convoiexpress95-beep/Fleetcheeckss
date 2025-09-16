@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-import { toast } from '@/hooks/use-toast';
+import { useToast } from '@/hooks';
 
 export interface Report {
   id: string;
@@ -149,6 +149,7 @@ export const useAnalytics = (dateFrom?: string, dateTo?: string) => {
 export const useGenerateReport = () => {
   const queryClient = useQueryClient();
   const { user } = useAuth();
+  const { toast } = useToast();
 
   return useMutation({
     mutationFn: async (params: {
@@ -213,6 +214,7 @@ export const useGenerateReport = () => {
 export const useCalculateAnalytics = () => {
   const queryClient = useQueryClient();
   const { user } = useAuth();
+  const { toast } = useToast();
 
   return useMutation({
     mutationFn: async (date: string) => {
@@ -303,6 +305,7 @@ export const useMonthlyStats = () => {
 export const useDeleteReport = () => {
   const queryClient = useQueryClient();
   const { user } = useAuth();
+  const { toast } = useToast();
 
   return useMutation({
     mutationFn: async (reportId: string) => {

@@ -9,10 +9,12 @@ export interface FleetVehicle {
 }
 
 export const vehicles: FleetVehicle[] = [
-  { id: '1', name: 'Citadine', brand: 'Renault', category: 'voiture', image: 'https://via.placeholder.com/160x90?text=Citadine' },
-  { id: '2', name: 'SUV Compact', brand: 'Peugeot', category: 'voiture', image: 'https://via.placeholder.com/160x90?text=SUV' },
-  { id: '3', name: 'Utilitaire Léger', brand: 'Renault', category: 'utilitaire', image: 'https://via.placeholder.com/160x90?text=Utilitaire' },
-  { id: '4', name: 'Moto', brand: 'Yamaha', category: '2_roues', image: 'https://via.placeholder.com/160x90?text=Moto' },
+  { id: '1', name: 'Citadine', brand: 'Renault', category: 'voiture', image: '/vehicles/renault-clio.jpg' },
+  { id: '2', name: 'SUV Compact', brand: 'Peugeot', category: 'voiture', image: '/vehicles/peugeot-3008.jpg' },
+  { id: '3', name: 'Utilitaire Léger', brand: 'Renault', category: 'utilitaire', image: '/vehicles/placeholder.svg' },
+  { id: '4', name: 'Moto', brand: 'Yamaha', category: '2_roues', image: '/silhouettes/moto.svg' },
+  { id: '5', name: 'Remorque', brand: 'Générique', category: 'utilitaire', image: '/silhouettes/utilitaire.svg' },
+  { id: '6', name: 'Plateau', brand: 'Générique', category: 'utilitaire', image: '/silhouettes/camion.svg' },
 ];
 
 export function findVehicleByName(name: string){

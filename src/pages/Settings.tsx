@@ -31,7 +31,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
-import { toast } from '@/hooks/use-toast';
+import { useToast } from '@/hooks';
 
 interface UserProfile {
   id: string;
@@ -56,6 +56,7 @@ interface UserSettings {
 }
 
 const Settings = () => {
+  const { toast } = useToast();
   const { user, signOut } = useAuth();
   const [loading, setLoading] = useState(false);
   const [profile, setProfile] = useState<UserProfile | null>(null);

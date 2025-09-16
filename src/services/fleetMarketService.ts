@@ -1,18 +1,42 @@
 import { FleetMarketMission } from '@/components/FleetMarketMissionCard';
 import { supabase } from '@/integrations/supabase/client';
 
-// Fallback mémoire si supabase échoue
+// Mémoire locale (utilisée uniquement en lecture si la base est inaccessible)
 let memory: FleetMarketMission[] = [
   {
-    id: 'm-demo-1',
-    titre: 'Mission démo',
-    description: 'Trajet Paris → Lyon',
+    id: '1',
+    titre: 'Transport véhicule Paris-Lyon',
+    description: 'Convoyage d\'une berline de Paris vers Lyon, véhicule récent en parfait état.',
     ville_depart: 'Paris',
     ville_arrivee: 'Lyon',
-    date_depart: new Date().toISOString(),
-    prix_propose: 250,
+    date_depart: new Date(Date.now() + 86400000 * 2).toISOString(),
+    prix_propose: 850,
     statut: 'ouverte',
-    vehicule_requis: 'berline',
+    vehicule_requis: 'Remorque',
+    convoyeur_id: null
+  },
+  {
+    id: '2',
+    titre: 'Convoyage Marseille-Bordeaux',
+    description: 'Transport d\'un SUV compact, départ flexible selon convoyeur.',
+    ville_depart: 'Marseille',
+    ville_arrivee: 'Bordeaux',
+    date_depart: new Date(Date.now() + 86400000 * 5).toISOString(),
+    prix_propose: 650,
+    statut: 'en_negociation',
+    vehicule_requis: 'Plateau',
+    convoyeur_id: null
+  },
+  {
+    id: '3',
+    titre: 'Moto sportive Nice-Monaco',
+    description: 'Convoyage d\'une moto sportive haut de gamme, manipulation délicate requise.',
+    ville_depart: 'Nice',
+    ville_arrivee: 'Monaco',
+    date_depart: new Date(Date.now() + 86400000).toISOString(),
+    prix_propose: 180,
+    statut: 'ouverte',
+    vehicule_requis: 'Moto',
     convoyeur_id: null
   }
 ];
@@ -59,10 +83,44 @@ const mapRow = (r: FleetRowSelect): FleetMarketMission => ({
   convoyeur_id: r.convoyeur_id
 });
 
+// Résolution dynamique de la table pour compatibilité avec drive-connect-suite-main
+// Priorité: 'fleetmarket_missions', fallback: 'marketplace_missions'
+let resolvedTable: 'fleetmarket_missions' | 'marketplace_missions' | null = null;
+
+async function resolveTableName(): Promise<'fleetmarket_missions' | 'marketplace_missions'> {
+  if (resolvedTable) return resolvedTable;
+  // Essai rapide sur fleetmarket_missions (HEAD select)
+  try {
+    const { error } = await supabase
+      .from('fleetmarket_missions')
+      .select('id', { count: 'exact', head: true })
+      .limit(1);
+    if (!error) {
+      resolvedTable = 'fleetmarket_missions';
+      return resolvedTable;
+    }
+  } catch (_) { /* ignore */ }
+  // Fallback: marketplace_missions
+  try {
+    const { error } = await supabase
+      .from('marketplace_missions')
+      .select('id', { count: 'exact', head: true })
+      .limit(1);
+    if (!error) {
+      resolvedTable = 'marketplace_missions';
+      return resolvedTable;
+    }
+  } catch (_) { /* ignore */ }
+  // Par défaut, rester sur fleetmarket_missions même si non existante (le fallback mémoire prendra le relais)
+  resolvedTable = 'fleetmarket_missions';
+  return resolvedTable;
+}
+
 export async function listMissions(): Promise<FleetMarketMission[]> {
   try {
+    const table = await resolveTableName();
     const { data, error } = await supabase
-      .from('fleetmarket_missions')
+      .from(table)
       .select('*')
       .order('created_at', { ascending: false })
       .limit(100);
@@ -88,29 +146,29 @@ export async function publishMission(partial: Omit<FleetMarketMission,'id'|'stat
     vehicule_requis: partial.vehicule_requis ?? null,
     statut: 'ouverte'
   };
-  try {
-    const { data, error } = await supabase
-      .from('fleetmarket_missions')
-      .insert(row)
-      .select('*')
-      .single();
-    if (error) throw error;
-    const mission = mapRow(data);
-    // Mettre aussi en cache mémoire
-    memory.unshift(mission);
-    return mission;
-  } catch (e) {
-    console.warn('[FleetMarket] fallback mémoire publishMission', e);
-    const mission: FleetMarketMission = { id: 'm-'+Date.now(), statut: 'ouverte', convoyeur_id: null, ...partial };
-    memory.unshift(mission);
-    return mission;
+  const table = await resolveTableName();
+  const { data, error } = await supabase
+    .from(table)
+    .insert(row)
+    .select('*')
+    .single();
+  if (error) {
+    // Le trigger lève une erreur 'INSUFFICIENT_CREDITS' si solde < 1
+    if ((error as any).message?.includes('INSUFFICIENT_CREDITS')) {
+      throw new Error('Crédits insuffisants pour publier (1 crédit requis)');
+    }
+    throw error;
   }
+  const mission = mapRow(data);
+  memory.unshift(mission);
+  return mission;
 }
 
 export async function updateMissionStatus(id: string, statut: 'ouverte'|'en_negociation'|'attribuee'|'terminee'|'annulee') {
   try {
+    const table = await resolveTableName();
     const { data, error } = await supabase
-      .from('fleetmarket_missions')
+      .from(table)
       .update({ statut })
       .eq('id', id)
       .select('*')
@@ -128,8 +186,9 @@ export async function updateMissionStatus(id: string, statut: 'ouverte'|'en_nego
 
 export async function assignMission(id: string, convoyeurUserId: string) {
   try {
+    const table = await resolveTableName();
     const { data, error } = await supabase
-      .from('fleetmarket_missions')
+      .from(table)
       .update({ statut: 'attribuee', convoyeur_id: convoyeurUserId })
       .eq('id', id)
       .select('*')

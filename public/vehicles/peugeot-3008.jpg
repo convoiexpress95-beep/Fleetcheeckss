@@ -1,0 +1,12 @@
+<svg width="300" height="200" viewBox="0 0 300 200" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="300" height="200" fill="#f9fafb"/>
+  <rect x="45" y="80" width="210" height="55" rx="10" fill="#1d4ed8"/>
+  <rect x="40" y="70" width="220" height="40" rx="8" fill="#1e40af"/>
+  <circle cx="90" cy="160" r="20" fill="#111827"/>
+  <circle cx="210" cy="160" r="20" fill="#111827"/>
+  <circle cx="90" cy="160" r="12" fill="#4b5563"/>
+  <circle cx="210" cy="160" r="12" fill="#4b5563"/>
+  <rect x="65" y="85" width="14" height="9" rx="1" fill="#ffffff" fill-opacity="0.9"/>
+  <rect x="85" y="85" width="14" height="9" rx="1" fill="#ffffff" fill-opacity="0.9"/>
+  <text x="150" y="40" text-anchor="middle" fill="#1f2937" font-family="Arial" font-size="12" font-weight="600">Peugeot 3008</text>
+</svg>

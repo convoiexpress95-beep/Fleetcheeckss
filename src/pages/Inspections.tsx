@@ -353,7 +353,7 @@ const Inspections = () => {
               </div>
             </CardHeader>
             <CardContent className="space-y-4">
-              <Button asChild className="w-full bg-gradient-cosmic hover:scale-105 transition-all duration-300 glow-hover">
+              <Button asChild className="w-full bg-gradient-turquoise hover:scale-105 transition-all duration-300 glow-hover">
                 <Link to="/missions/new">
                   <Plus className="w-5 h-5 mr-2" />
                   Nouvelle mission
@@ -382,7 +382,7 @@ const Inspections = () => {
               </div>
             </CardHeader>
             <CardContent className="space-y-4">
-              <Button asChild className="w-full bg-gradient-sunset hover:scale-105 transition-all duration-300 glow-hover">
+              <Button asChild className="w-full bg-gradient-turquoise hover:scale-105 transition-all duration-300 glow-hover">
                 <Link to="/contacts">
                   <Sparkles className="w-5 h-5 mr-2" />
                   Gérer les contacts

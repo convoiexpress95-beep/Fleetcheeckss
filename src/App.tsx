@@ -2,16 +2,15 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { MobileLayout } from "@/components/MobileLayout";
 import Landing from "./pages/Landing";
+import NewLanding from "./landing/Landing";
 import Login from "./pages/Login";
-import Dashboard from "./pages/Dashboard";
 import Missions from "./pages/Missions";
-import NewMission from "./pages/NewMission";
 import EditMission from "./pages/EditMission";
 import Contacts from "./pages/Contacts";
 import Tracking from "./pages/Tracking";
@@ -20,10 +19,17 @@ import Reports from "./pages/Reports";
 import Billing from "./pages/Billing";
 import Shop from "./pages/Shop";
 import Marketplace from "./pages/Marketplace";
+import MissionDetailMarketplace from "./pages/MissionDetailMarketplace";
+import MyOffers from "./pages/MyOffers";
+import ConvoyeurProfile from "./pages/ConvoyeurProfile";
+import MarketplaceMessages from "./pages/MarketplaceMessages";
+import ActiveMissions from "./pages/ActiveMissions";
+import MissionHistory from "./pages/MissionHistory";
 import PostMarketplaceMission from "./pages/PostMarketplaceMission";
 import AcceptedMarketplaceMissions from "./pages/AcceptedMarketplaceMissions";
 import Settings from "./pages/Settings";
 import Admin from "./pages/Admin";
+import NewMission from "./pages/NewMission";
 import Catalog from "./pages/Catalog";
 import NotFound from "./pages/NotFound";
 import ConvoiturageHome from "./pages/convoiturage/Index";
@@ -33,6 +39,7 @@ import ConvoiturageMyTrips from "./pages/convoiturage/MyTrips";
 import ConvoiturageMessages from "./pages/convoiturage/Messages";
 import ConvoiturageProfile from "./pages/convoiturage/Profile";
 import ConvoiturageLayout from "./pages/convoiturage/Layout";
+import Dashboard from "./pages/Dashboard";
 
 const queryClient = new QueryClient();
 
@@ -45,7 +52,7 @@ const App = () => (
           <Sonner />
           <BrowserRouter>
           <Routes>
-            <Route path="/" element={<Landing />} />
+            <Route path="/" element={<NewLanding />} />
             <Route path="/login" element={<Login />} />
             <Route path="/auth/login" element={<Login />} />
             <Route path="/public-tracking/:token" element={<PublicTracking />} />
@@ -173,6 +180,48 @@ const App = () => (
                 </DashboardLayout>
               </ProtectedRoute>
             } />
+            <Route path="/marketplace/missions/:id" element={
+              <ProtectedRoute>
+                <DashboardLayout>
+                  <MissionDetailMarketplace />
+                </DashboardLayout>
+              </ProtectedRoute>
+            } />
+            <Route path="/marketplace/my-offers" element={
+              <ProtectedRoute>
+                <DashboardLayout>
+                  <MyOffers />
+                </DashboardLayout>
+              </ProtectedRoute>
+            } />
+            <Route path="/marketplace/profiles" element={
+              <ProtectedRoute>
+                <DashboardLayout>
+                  <ConvoyeurProfile />
+                </DashboardLayout>
+              </ProtectedRoute>
+            } />
+            <Route path="/marketplace/messages" element={
+              <ProtectedRoute>
+                <DashboardLayout>
+                  <MarketplaceMessages />
+                </DashboardLayout>
+              </ProtectedRoute>
+            } />
+            <Route path="/marketplace/active-missions" element={
+              <ProtectedRoute>
+                <DashboardLayout>
+                  <ActiveMissions />
+                </DashboardLayout>
+              </ProtectedRoute>
+            } />
+            <Route path="/marketplace/history" element={
+              <ProtectedRoute>
+                <DashboardLayout>
+                  <MissionHistory />
+                </DashboardLayout>
+              </ProtectedRoute>
+            } />
             <Route path="/marketplace/post" element={
               <ProtectedRoute>
                 <DashboardLayout>
@@ -187,6 +236,7 @@ const App = () => (
                 </DashboardLayout>
               </ProtectedRoute>
             } />
+            <Route path="/trajets-partages" element={<Navigate to="/convoiturage" replace />} />
             <Route path="/settings" element={
               <ProtectedRoute>
                 <DashboardLayout>

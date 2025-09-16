@@ -9,6 +9,7 @@ export default {
     "./components/**/*.{ts,tsx}",
     "./app/**/*.{ts,tsx}",
     "./src/**/*.{ts,tsx}",
+    "./external-landing/**/*.{ts,tsx}",
   ],
   prefix: "",
   theme: {
@@ -72,6 +73,7 @@ export default {
         'gradient-ocean': 'var(--gradient-ocean)',
         'gradient-cosmic': 'var(--gradient-cosmic)',
         'gradient-royal': 'var(--gradient-royal)',
+        'gradient-turquoise': 'var(--gradient-turquoise)',
         'gradient-neon': 'var(--gradient-neon)',
         'gradient-fire': 'var(--gradient-fire)',
         'gradient-glass': 'var(--gradient-glass)',

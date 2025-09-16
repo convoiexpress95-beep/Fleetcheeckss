@@ -1,0 +1,12 @@
+<svg width="300" height="200" viewBox="0 0 300 200" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="300" height="200" fill="#f5f7fa"/>
+  <rect x="48" y="86" width="204" height="49" rx="8" fill="#059669"/>
+  <rect x="43" y="76" width="214" height="34" rx="6" fill="#047857"/>
+  <circle cx="86" cy="156" r="17" fill="#1f2937"/>
+  <circle cx="214" cy="156" r="17" fill="#1f2937"/>
+  <circle cx="86" cy="156" r="9" fill="#6b7280"/>
+  <circle cx="214" cy="156" r="9" fill="#6b7280"/>
+  <rect x="68" y="89" width="12" height="7" rx="1" fill="#ffffff" fill-opacity="0.9"/>
+  <rect x="84" y="89" width="12" height="7" rx="1" fill="#ffffff" fill-opacity="0.9"/>
+  <text x="150" y="44" text-anchor="middle" fill="#065f46" font-family="Arial" font-size="12" font-weight="600">VW Tiguan</text>
+</svg>

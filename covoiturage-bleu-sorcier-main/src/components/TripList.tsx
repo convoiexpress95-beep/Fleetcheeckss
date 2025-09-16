@@ -1,63 +1,41 @@
 import { TripCard } from "./TripCard";
-
-const mockTrips = [
-  {
-    id: "1",
-    departure: "Paris",
-    destination: "Lyon",
-    departureTime: "08:30",
-    duration: "4h 30min",
-    price: 25,
-    availableSeats: 3,
-    route: ["Melun", "Auxerre", "Chalon-sur-Saône"],
-    driver: {
-      id: "d1",
-      name: "Marie Dubois",
-      avatar: "/placeholder-avatar.jpg",
-      rating: 4.8,
-      reviewCount: 127,
-      isVerified: true,
-    },
-  },
-  {
-    id: "2",
-    departure: "Paris",
-    destination: "Lyon",
-    departureTime: "14:15",
-    duration: "4h 45min",
-    price: 28,
-    availableSeats: 2,
-    route: ["Fontainebleau", "Sens", "Mâcon"],
-    driver: {
-      id: "d2",
-      name: "Thomas Martin",
-      avatar: "/placeholder-avatar.jpg",
-      rating: 4.9,
-      reviewCount: 89,
-      isVerified: true,
-    },
-  },
-  {
-    id: "3",
-    departure: "Paris",
-    destination: "Lyon",
-    departureTime: "18:45",
-    duration: "4h 20min",
-    price: 30,
-    availableSeats: 1,
-    route: ["Nemours", "Joigny", "Villefranche"],
-    driver: {
-      id: "d3",
-      name: "Sophie Leclerc",
-      avatar: "/placeholder-avatar.jpg",
-      rating: 4.7,
-      reviewCount: 203,
-      isVerified: false,
-    },
-  },
-];
+import { useMemo } from "react";
+import { useRidesList } from "@/hooks/useRides";
 
 export function TripList() {
+  // TODO: recevoir les filtres depuis SearchForm via contexte/props si besoin
+  const { data, isLoading } = useRidesList(undefined, 30);
+
+  const trips = useMemo(() => {
+    return (data || []).map((r) => {
+      const dt = (() => {
+        try { return new Date(r.departure_time); } catch { return null; }
+      })();
+      const departureTime = dt ? dt.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : '';
+      const duration = r.duration_minutes ? `${Math.floor(r.duration_minutes/60)}h ${r.duration_minutes%60}min` : "";
+      const availableSeats = typeof r.seats_available === 'number' ? r.seats_available : r.seats_total; 
+      const driverName = r.driver_profile?.display_name || 'Conducteur';
+      return {
+        id: r.id,
+        departure: r.departure,
+        destination: r.destination,
+        departureTime,
+        duration,
+        price: Number(r.price || 0),
+        availableSeats,
+        route: Array.isArray(r.route) ? r.route : [],
+        driver: {
+          id: r.driver_id,
+          name: driverName,
+          avatar: r.driver_profile?.avatar_url || undefined,
+          rating: 5,
+          reviewCount: 0,
+          isVerified: !!r.driver_profile?.is_convoyeur_confirme,
+        },
+      };
+    });
+  }, [data]);
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -65,12 +43,12 @@ export function TripList() {
           Trajets disponibles
         </h2>
         <div className="text-sm text-muted-foreground">
-          {mockTrips.length} trajets trouvés
+          {isLoading ? 'Chargement…' : `${trips.length} trajets trouvés`}
         </div>
       </div>
       
       <div className="space-y-4">
-        {mockTrips.map((trip) => (
+        {!isLoading && trips.map((trip) => (
           <TripCard key={trip.id} trip={trip} />
         ))}
       </div>

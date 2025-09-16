@@ -7,7 +7,7 @@ import { MapPin, Navigation, Clock, Zap, Battery, Signal } from 'lucide-react';
 import { useNativeGeolocation } from '@/hooks/useNativeGeolocation';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-import { toast } from '@/hooks/use-toast';
+import { useToast } from '@/hooks';
 
 interface NativeMissionTrackingProps {
   missionId: string;
@@ -15,6 +15,7 @@ interface NativeMissionTrackingProps {
 }
 
 export const NativeMissionTracking = ({ missionId, isActive = false }: NativeMissionTrackingProps) => {
+  const { toast } = useToast();
   const { user } = useAuth();
   const {
     isNative,

@@ -5,6 +5,8 @@ import './index.css'
 
 const rootEl = document.getElementById('root')!;
 const w = window as unknown as { __FC_ROOT?: Root };
+// Indicateur bundle principal
+(window as any).__BUNDLE_ID__ = 'main-app';
 // Réutilise la même instance de root entre les rechargements HMR
 const root = w.__FC_ROOT ?? createRoot(rootEl);
 w.__FC_ROOT = root;

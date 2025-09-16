@@ -22,7 +22,7 @@ export const ChatDrawer: React.FC<ChatDrawerProps> = ({ missionId, ownerId, conv
   const ensureConversation = React.useCallback(async () => {
     if (!user) return;
     // Try to find conversation
-    const { data: existing, error: e1 } = await supabase
+  const { data: existing, error: e1 } = await supabase
       .from('conversations')
       .select('id')
       .eq('mission_id', missionId)
@@ -35,7 +35,7 @@ export const ChatDrawer: React.FC<ChatDrawerProps> = ({ missionId, ownerId, conv
       return existing.id;
     }
     // Create
-    const { data: created, error: e2 } = await supabase
+  const { data: created, error: e2 } = await supabase
       .from('conversations')
       .insert({ mission_id: missionId, owner_id: ownerId, convoyeur_id: convoyeurId })
       .select('id')
@@ -50,7 +50,7 @@ export const ChatDrawer: React.FC<ChatDrawerProps> = ({ missionId, ownerId, conv
     (async () => {
       const id = await ensureConversation();
       if (!id) return;
-      const { data } = await supabase
+  const { data } = await supabase
         .from('messages')
         .select('*')
         .eq('conversation_id', id)
@@ -62,7 +62,7 @@ export const ChatDrawer: React.FC<ChatDrawerProps> = ({ missionId, ownerId, conv
   // Realtime messages
   React.useEffect(() => {
     if (!open || !convId) return;
-    const ch = supabase.channel(`rt-conv-${convId}`).on(
+  const ch = supabase.channel(`rt-conv-${convId}`).on(
       'postgres_changes',
       { event: 'INSERT', schema: 'public', table: 'messages', filter: `conversation_id=eq.${convId}` },
       (payload) => {
@@ -78,7 +78,7 @@ export const ChatDrawer: React.FC<ChatDrawerProps> = ({ missionId, ownerId, conv
     if (!user || !text.trim() || !convId) return;
     const content = text.trim();
     setText('');
-    const { data, error } = await supabase
+  const { data, error } = await supabase
       .from('messages')
       .insert({ conversation_id: convId, sender_id: user.id, content })
       .select('*')

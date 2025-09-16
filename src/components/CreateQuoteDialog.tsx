@@ -8,7 +8,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Plus, Trash2, FileText, Search } from 'lucide-react';
 import { useBilling, type Client, type QuoteItem } from '@/hooks/useBilling';
-import { toast } from '@/hooks/use-toast';
+import { useToast } from '@/hooks';
 
 interface Props {
   trigger?: React.ReactNode;
@@ -16,6 +16,7 @@ interface Props {
 }
 
 export const CreateQuoteDialog: React.FC<Props> = ({ trigger, onQuoteCreated }) => {
+  const { toast } = useToast();
   const { clients, validateSiret, saveClient, createQuote, addQuoteItems, loading } = useBilling();
   const [open, setOpen] = useState(false);
   const [step, setStep] = useState<'client' | 'details' | 'items'>('client');

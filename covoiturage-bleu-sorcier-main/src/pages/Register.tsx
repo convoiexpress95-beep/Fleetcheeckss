@@ -5,12 +5,24 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
+import { useAuth } from "@/hooks/useAuth";
 import { Car, Eye, EyeOff, Mail, Lock, User, Phone } from "lucide-react";
 
 const Register = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirm, setConfirm] = useState("");
+  const [terms, setTerms] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const navigate = useNavigate();
+  const { signUp } = useAuth();
 
   return (
     <div className="min-h-screen gradient-hero flex items-center justify-center px-4 py-8">
@@ -37,6 +49,8 @@ const Register = () => {
                   id="firstName"
                   type="text"
                   placeholder="Jean"
+                  value={firstName}
+                  onChange={(e)=>setFirstName(e.target.value)}
                 />
               </div>
               <div className="space-y-2">
@@ -45,6 +59,8 @@ const Register = () => {
                   id="lastName"
                   type="text"
                   placeholder="Dupont"
+                  value={lastName}
+                  onChange={(e)=>setLastName(e.target.value)}
                 />
               </div>
             </div>
@@ -58,6 +74,8 @@ const Register = () => {
                   type="email"
                   placeholder="votre@email.com"
                   className="pl-10"
+                  value={email}
+                  onChange={(e)=>setEmail(e.target.value)}
                 />
               </div>
             </div>
@@ -71,6 +89,8 @@ const Register = () => {
                   type="tel"
                   placeholder="06 12 34 56 78"
                   className="pl-10"
+                  value={phone}
+                  onChange={(e)=>setPhone(e.target.value)}
                 />
               </div>
             </div>
@@ -84,6 +104,8 @@ const Register = () => {
                   type={showPassword ? "text" : "password"}
                   placeholder="••••••••"
                   className="pl-10 pr-10"
+                  value={password}
+                  onChange={(e)=>setPassword(e.target.value)}
                 />
                 <Button
                   type="button"
@@ -110,6 +132,8 @@ const Register = () => {
                   type={showConfirmPassword ? "text" : "password"}
                   placeholder="••••••••"
                   className="pl-10 pr-10"
+                  value={confirm}
+                  onChange={(e)=>setConfirm(e.target.value)}
                 />
                 <Button
                   type="button"
@@ -129,7 +153,7 @@ const Register = () => {
           </div>
 
           <div className="flex items-center space-x-2">
-            <Checkbox id="terms" />
+            <Checkbox id="terms" checked={terms} onCheckedChange={(v)=>setTerms(!!v)} />
             <Label htmlFor="terms" className="text-sm text-muted-foreground">
               J'accepte les{" "}
               <Link to="/terms" className="text-primary hover:text-primary/80">
@@ -138,9 +162,27 @@ const Register = () => {
             </Label>
           </div>
 
-          <Button className="w-full" variant="hero" size="lg">
-            Créer mon compte
+          <Button
+            className="w-full"
+            variant="hero"
+            size="lg"
+            disabled={loading}
+            onClick={async ()=>{
+              setError(null);
+              if(!firstName || !lastName) { setError('Prénom et nom requis.'); return; }
+              if(!email || !password) { setError('Email et mot de passe requis.'); return; }
+              if(password !== confirm) { setError('Les mots de passe ne correspondent pas.'); return; }
+              if(!terms) { setError('Veuillez accepter les conditions.'); return; }
+              setLoading(true);
+              const ok = await signUp(email, password, { firstName, lastName, phone });
+              setLoading(false);
+              if(!ok) { setError('Inscription impossible.'); return; }
+              navigate('/');
+            }}
+          >
+            {loading ? 'Création…' : 'Créer mon compte'}
           </Button>
+          {error && <p className="text-sm text-red-600 text-center">{error}</p>}
 
           <Separator />
 

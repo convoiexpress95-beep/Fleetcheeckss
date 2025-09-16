@@ -11,7 +11,7 @@ import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import { useState } from "react";
 import { useConvoiturage } from "@/hooks/useConvoiturage";
-import { useToast } from "@/hooks/use-toast";
+import { useToast } from "@/hooks";
 import { MapPin, Calendar as CalendarIcon, Clock, Users, Euro, Car, Plus, X } from "lucide-react";
 
 const PublishTrip = () => {

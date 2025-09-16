@@ -1,0 +1,53 @@
+project_id = "lucpsjwaglmiejpfxofe"
+
+[api]
+enabled = true
+port = 54321
+schemas = ["public", "graphql_public"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
+
+[auth]
+enabled = true
+port = 54324
+site_url = "http://localhost:5173"
+additional_redirect_urls = ["https://lucpsjwaglmiejpfxofe.supabase.co"]
+jwt_expiry = 3600
+enable_signup = true
+
+[auth.email]
+enable_signup = true
+double_confirm_changes = true
+enable_confirmations = false
+
+[db]
+enabled = true
+port = 54322
+
+[db.pooler]
+enabled = false
+port = 54329
+pool_mode = "transaction"
+default_pool_size = 20
+max_client_conn = 100
+
+[realtime]
+enabled = true
+port = 54323
+
+[storage]
+enabled = true
+port = 54324
+file_size_limit = "50MiB"
+s3_max_part_size = "5MiB"
+
+[edge_functions]
+enabled = true
+port = 54324
+
+[functions.verify-siret]
+verify_jwt = true
+
+[analytics]
+enabled = false
+port = 54327

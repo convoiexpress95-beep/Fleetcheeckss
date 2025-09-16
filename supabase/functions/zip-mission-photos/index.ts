@@ -90,11 +90,11 @@ serve(async (req) => {
   // Métadonnées PDF
   const now = new Date();
   pdfDoc.setTitle(`Rapport mission ${missionRow.reference || missionRow.id}`);
-  pdfDoc.setAuthor('FleetChecks');
+  pdfDoc.setAuthor('FleetCheecks');
   pdfDoc.setSubject('Rapport de mission avec photos');
-  pdfDoc.setKeywords(['FleetChecks', 'Rapport', 'Mission', String(missionRow.reference || missionRow.id)]);
-  pdfDoc.setProducer('FleetChecks Exporter');
-  pdfDoc.setCreator('FleetChecks PDF Generator');
+  pdfDoc.setKeywords(['FleetCheecks', 'Rapport', 'Mission', String(missionRow.reference || missionRow.id)]);
+  pdfDoc.setProducer('FleetCheecks Exporter');
+  pdfDoc.setCreator('FleetCheecks PDF Generator');
   pdfDoc.setCreationDate(now);
   pdfDoc.setModificationDate(now);
 

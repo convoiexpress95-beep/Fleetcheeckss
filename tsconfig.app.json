@@ -26,8 +26,15 @@
       "@/*": ["./src/*"]
     }
   },
-  "include": ["src"],
+  "include": [
+    "src"
+  ],
   "exclude": [
-    "src/components/fleetcheck/**"
+    "src/components/fleetcheck/**",
+  "app-syncer/**",
+    "drive-connect-suite-main/**",
+    "mobile-app/**",
+    "dist/**",
+    "**/archive/**"
   ]
 }

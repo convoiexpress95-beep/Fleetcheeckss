@@ -14,7 +14,7 @@ import { CreateQuoteDialog } from '@/components/CreateQuoteDialog';
 import { CreateInvoiceDialog } from '@/components/CreateInvoiceDialog';
 import { InvoicePreview } from '@/components/InvoicePreview';
 import { QuotePreview } from '@/components/QuotePreview';
-import { toast } from '@/hooks/use-toast';
+import { useToast } from '@/hooks';
 
 const Billing = () => {
   const { 
@@ -31,6 +31,7 @@ const Billing = () => {
     loadInvoices,
     loadQuotes
   } = useBilling();
+  const { toast } = useToast();
   
   const [companyDialogOpen, setCompanyDialogOpen] = useState(false);
   const [companyData, setCompanyData] = useState<CompanyInfo>({
@@ -195,7 +196,7 @@ const Billing = () => {
           {/* Company Setup Button */}
           <Dialog open={companyDialogOpen} onOpenChange={setCompanyDialogOpen}>
             <DialogTrigger asChild>
-              <Button className="bg-gradient-royal hover:scale-105 transition-all duration-300 glow-hover">
+              <Button className="bg-gradient-turquoise hover:scale-105 transition-all duration-300 glow-hover">
                 <Building className="w-4 h-4 mr-2" />
                 {companyInfo ? 'Modifier entreprise' : 'Configurer entreprise'}
               </Button>

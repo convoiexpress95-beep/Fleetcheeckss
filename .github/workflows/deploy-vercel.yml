@@ -8,4 +8,4 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Notice
-  run: echo 'Deprecated: deployment is handled by Vercel project integration. This workflow remains only as a stub.'
+        run: echo 'Deprecated: deployment is handled by Vercel project integration. This workflow remains only as a stub.'

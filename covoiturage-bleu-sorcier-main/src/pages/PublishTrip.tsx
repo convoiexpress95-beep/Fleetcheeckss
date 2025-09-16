@@ -10,7 +10,10 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import { useAuth } from "@/hooks/useAuth";
+import { useNavigate } from "react-router-dom";
+import { useCreateRide } from "@/hooks/useRides";
 import { 
   MapPin, 
   Calendar as CalendarIcon, 
@@ -25,6 +28,21 @@ import {
 const PublishTrip = () => {
   const [date, setDate] = useState<Date>();
   const [options, setOptions] = useState<string[]>([]);
+  const { user } = useAuth();
+  const navigate = useNavigate();
+  const createRide = useCreateRide(user?.id);
+  const [form, setForm] = useState({
+    departure: "",
+    destination: "",
+    time: "",
+    seats: "",
+    price: "",
+    description: "",
+  });
+  const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const seatsTotal = useMemo(()=> Number(form.seats || 0), [form.seats]);
+  const priceNum = useMemo(()=> Number(form.price || 0), [form.price]);
 
   const availableOptions = [
     "Climatisation",
@@ -76,6 +94,8 @@ const PublishTrip = () => {
                       id="departure"
                       placeholder="Ville de départ"
                       className="pl-10"
+                      value={form.departure}
+                      onChange={(e)=>setForm(f=>({...f, departure: e.target.value}))}
                     />
                   </div>
                 </div>
@@ -87,6 +107,8 @@ const PublishTrip = () => {
                       id="destination"
                       placeholder="Ville d'arrivée"
                       className="pl-10"
+                      value={form.destination}
+                      onChange={(e)=>setForm(f=>({...f, destination: e.target.value}))}
                     />
                   </div>
                 </div>
@@ -125,6 +147,8 @@ const PublishTrip = () => {
                       id="time"
                       type="time"
                       className="pl-10"
+                      value={form.time}
+                      onChange={(e)=>setForm(f=>({...f, time: e.target.value}))}
                     />
                   </div>
                 </div>
@@ -134,7 +158,7 @@ const PublishTrip = () => {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label className="text-foreground">Nombre de places</Label>
-                  <Select>
+                  <Select onValueChange={(v)=>setForm(f=>({...f, seats: v}))}>
                     <SelectTrigger>
                       <div className="flex items-center gap-2">
                         <Users className="w-4 h-4 text-muted-foreground" />
@@ -142,13 +166,9 @@ const PublishTrip = () => {
                       </div>
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="1">1 place</SelectItem>
-                      <SelectItem value="2">2 places</SelectItem>
-                      <SelectItem value="3">3 places</SelectItem>
-                      <SelectItem value="4">4 places</SelectItem>
-                      <SelectItem value="5">5 places</SelectItem>
-                      <SelectItem value="6">6 places</SelectItem>
-                      <SelectItem value="7">7 places</SelectItem>
+                      {[1,2,3,4,5,6,7].map(n => (
+                        <SelectItem key={n} value={String(n)}>{n} {n>1? 'places':'place'}</SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
@@ -162,6 +182,8 @@ const PublishTrip = () => {
                       placeholder="15"
                       className="pl-10"
                       min="0"
+                      value={form.price}
+                      onChange={(e)=>setForm(f=>({...f, price: e.target.value}))}
                     />
                   </div>
                 </div>
@@ -198,6 +220,8 @@ const PublishTrip = () => {
                   id="description"
                   placeholder="Ajoutez des détails sur votre trajet, points de rendez-vous, etc."
                   className="min-h-[100px]"
+                  value={form.description}
+                  onChange={(e)=>setForm(f=>({...f, description: e.target.value}))}
                 />
               </div>
 
@@ -206,10 +230,49 @@ const PublishTrip = () => {
                 <Button variant="outline" className="flex-1">
                   Aperçu
                 </Button>
-                <Button variant="hero" className="flex-1">
+                <Button
+                  variant="hero"
+                  className="flex-1"
+                  disabled={saving}
+                  onClick={async ()=>{
+                    setError(null);
+                    if(!user){ navigate('/login'); return; }
+                    if(!form.departure.trim() || !form.destination.trim()) { setError('Départ et destination sont obligatoires.'); return; }
+                    if(!date || !form.time) { setError('Date et heure sont obligatoires.'); return; }
+                    if(!(seatsTotal>0)) { setError('Nombre de places invalide.'); return; }
+                    if(priceNum<0) { setError('Prix invalide.'); return; }
+                    setSaving(true);
+                    try{
+                      const iso = (()=>{
+                        const [hh,mm] = (form.time||'').split(':');
+                        const d = new Date(date);
+                        d.setHours(Number(hh||0), Number(mm||0), 0, 0);
+                        return d.toISOString();
+                      })();
+                      const { id } = await createRide.mutateAsync({
+                        departure: form.departure,
+                        destination: form.destination,
+                        departure_time: iso,
+                        raw_time: form.time,
+                        seats_total: seatsTotal,
+                        price: priceNum,
+                        description: form.description || undefined,
+                        options,
+                      });
+                      navigate(`/trip/${id}`);
+                    } catch(e: unknown){
+                      type ErrLike = { message?: string };
+                      const msg = (e && typeof e === 'object' && 'message' in e) ? String((e as ErrLike).message || '') : 'Impossible de publier le trajet';
+                      setError(msg);
+                    } finally {
+                      setSaving(false);
+                    }
+                  }}
+                >
                   Publier le trajet
                 </Button>
               </div>
+              {error && <p className="text-red-600 text-sm mt-2">{error}</p>}
             </CardContent>
           </Card>
         </div>

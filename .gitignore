@@ -1,6 +1,8 @@
 # Node / Expo / React / Supabase
 node_modules/
 **/node_modules/
+bun.lockb
+**/bun.lockb
 .expo/
 .expo-shared/
 dist/
@@ -34,7 +36,7 @@ Thumbs.db
 # Ignorer seulement les dossiers Android/iOS à la racine du repo
 /android/
 /ios/
-# (mobile-app supprimé) règles conservées retirées
+# mobile-app supprimé (migration complète vers web). Dossier retiré du repo.
 
 # Supabase local artifacts
 supabase/.temp/

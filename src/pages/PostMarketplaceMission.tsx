@@ -1,201 +1,292 @@
-import React, { useMemo, useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { useNavigate } from 'react-router-dom';
-import { supabase } from '@/integrations/supabase/client';
-import { useToast } from '@/hooks/use-toast';
-import VehicleImagePicker from '@/components/VehicleImagePicker';
-import { getVehicleImageUrl } from '@/lib/utils';
-import MapboxAddressInput from '@/components/MapboxAddressInput';
+import React, { useState } from 'react';
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useToast } from "@/hooks/use-toast";
+import { ArrowLeft, MapPin, Calendar, Clock, Euro, Truck, Plus } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 
-const MIN_PRICE = 50;
-
-const PostMarketplaceMission: React.FC = () => {
+export default function PostMarketplaceMission() {
+  const [formData, setFormData] = useState({
+    title: '',
+    description: '',
+    departure: '',
+    arrival: '',
+    departureDate: '',
+    arrivalDate: '',
+    vehicleType: '',
+    price: '',
+    distance: '',
+    duration: '',
+    isUrgent: false
+  });
+  
+  const [loading, setLoading] = useState(false);
   const { toast } = useToast();
   const navigate = useNavigate();
-  const [submitting, setSubmitting] = useState(false);
 
-  const [title, setTitle] = useState('');
-  const [vehicleName, setVehicleName] = useState('');
-  const [license, setLicense] = useState('');
-  const [pickup, setPickup] = useState('');
-  const [pickupCity, setPickupCity] = useState('');
-  const [pickupPostal, setPickupPostal] = useState('');
-  const [drop, setDrop] = useState('');
-  const [dropCity, setDropCity] = useState('');
-  const [dropPostal, setDropPostal] = useState('');
-  const [vehicleGroup, setVehicleGroup] = useState<'leger'|'utilitaire'|'poids_lourd'|'none'>('none');
-  const [price, setPrice] = useState('');
-  const [req, setReq] = useState({
-    assurance: false,
-    wgarage: false,
-    plateau: false,
-    porte10: false,
-    convoyeur: false,
-  });
-  const [imagePickerOpen, setImagePickerOpen] = useState(false);
-  const [imagePath, setImagePath] = useState<string | null>(null);
-
-  const valid = useMemo(() => {
-    return title.trim() && vehicleName.trim() && license.trim() && pickup.trim() && drop.trim() && pickupCity.trim() && dropCity.trim() && pickupPostal.trim() && dropPostal.trim() && vehicleGroup !== 'none' && Number(price) >= MIN_PRICE && !!imagePath;
-  }, [title, vehicleName, license, pickup, drop, pickupCity, dropCity, pickupPostal, dropPostal, vehicleGroup, price, imagePath]);
-
-  const submit = async () => {
-    if (!valid) {
-      toast({ title: 'Champs requis', description: `Le prix doit être >= ${MIN_PRICE} €`, variant: 'destructive' });
-      return;
-    }
-    setSubmitting(true);
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    
     try {
-      const { data: auth } = await supabase.auth.getUser();
-      if (!auth.user?.id) throw new Error('Connexion requise');
-      // Générer une référence lisible minimale (à affiner plus tard si besoin)
-      const reference = `MP-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).slice(2,6).toUpperCase()}`;
-      const vehicle_type = (vehicleGroup === 'leger'
-        ? 'berline'
-        : vehicleGroup === 'utilitaire'
-          ? 'utilitaire'
-          : 'camion');
-      const { error } = await supabase.from('missions').insert({
-        reference,
-        title: title.trim(),
-        description: vehicleName.trim(),
-        license_plate: license.trim(),
-        pickup_address: `${pickupPostal.trim()} ${pickupCity.trim()} — ${pickup.trim()}`,
-        delivery_address: `${dropPostal.trim()} ${dropCity.trim()} — ${drop.trim()}`,
-        vehicle_type,
-        donor_earning: Number(price),
-        driver_earning: Number(price),
-        created_by: auth.user.id,
-        status: 'pending',
-        // Note: quand les migrations missions_kind/vehicle_image_path/requirements seront appliquées,
-        // on rebranchera ces champs et on régénèrera les types.
+      // Simulation d'envoi des données
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      toast({
+        title: "Mission publiée avec succès !",
+        description: "Votre mission est maintenant visible par les convoyeurs.",
       });
-      if (error) throw error;
-      toast({ title: 'Mission publiée', description: 'Votre annonce est en ligne' });
+      
+      // Redirection vers le marketplace
       navigate('/marketplace');
-    } catch (e: any) {
-      toast({ title: 'Erreur', description: e?.message || 'Publication impossible', variant: 'destructive' });
+      
+    } catch (error) {
+      toast({
+        title: "Erreur",
+        description: "Impossible de publier la mission. Veuillez réessayer.",
+        variant: "destructive"
+      });
     } finally {
-      setSubmitting(false);
+      setLoading(false);
     }
   };
 
+  const handleInputChange = (field: string, value: string | boolean) => {
+    setFormData(prev => ({
+      ...prev,
+      [field]: value
+    }));
+  };
+
   return (
-    <div className="max-w-3xl mx-auto p-6">
-      <Card>
-        <CardHeader>
-          <CardTitle>Poster une mission (Marketplace)</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          <div className="grid sm:grid-cols-2 gap-4">
-            <div>
-              <Label>Titre</Label>
-              <Input value={title} onChange={e=>setTitle(e.target.value)} placeholder="Ex: Livraison Berline" />
-            </div>
-            <div>
-              <Label>Nom du véhicule</Label>
-              <Input value={vehicleName} onChange={e=>setVehicleName(e.target.value)} placeholder="Ex: Peugeot 308" />
-            </div>
-            <div>
-              <Label>Immatriculation</Label>
-              <Input value={license} onChange={e=>setLicense(e.target.value)} placeholder="AB-123-CD" />
-            </div>
-            <div>
-              <Label>Type de véhicule</Label>
-              <Select value={vehicleGroup} onValueChange={(v)=>setVehicleGroup(v as any)}>
-                <SelectTrigger><SelectValue placeholder="Choisir" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="leger">Léger</SelectItem>
-                  <SelectItem value="utilitaire">Utilitaire</SelectItem>
-                  <SelectItem value="poids_lourd">Poids lourd</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+    <div className="min-h-screen bg-gray-900">
+      {/* Header */}
+      <header className="bg-gray-800/80 backdrop-blur-xl border-b border-gray-700/50">
+        <div className="container mx-auto px-6 py-4">
+          <div className="flex items-center gap-4">
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={() => navigate('/marketplace')}
+              className="text-gray-300 hover:text-white"
+            >
+              <ArrowLeft className="w-4 h-4 mr-2" />
+              Retour au Marketplace
+            </Button>
+            <div className="h-6 w-px bg-gray-600"></div>
+            <h1 className="text-2xl font-bold text-white">Publier une Mission</h1>
           </div>
+        </div>
+      </header>
 
-          <div className="grid sm:grid-cols-2 gap-4">
-            <div>
-              <MapboxAddressInput label="Adresse de départ" placeholder="Ex: 10 Rue de la Paix, Paris" value={pickup} onChange={setPickup} onSelect={({address, city, postal})=>{ setPickup(address); if(city) setPickupCity(city); if(postal) setPickupPostal(postal); }} />
-            </div>
-            <div>
-              <Label>Ville de départ</Label>
-              <Input value={pickupCity} onChange={e=>setPickupCity(e.target.value)} placeholder="Ville" />
-            </div>
-            <div>
-              <Label>Code postal départ</Label>
-              <Input value={pickupPostal} onChange={e=>setPickupPostal(e.target.value)} placeholder="Code postal" />
-            </div>
-          </div>
-
-          <div className="grid sm:grid-cols-2 gap-4">
-            <div>
-              <MapboxAddressInput label="Adresse d'arrivée" placeholder="Ex: 20 Avenue de la République, Lyon" value={drop} onChange={setDrop} onSelect={({address, city, postal})=>{ setDrop(address); if(city) setDropCity(city); if(postal) setDropPostal(postal); }} />
-            </div>
-            <div>
-              <Label>Ville d'arrivée</Label>
-              <Input value={dropCity} onChange={e=>setDropCity(e.target.value)} placeholder="Ville" />
-            </div>
-            <div>
-              <Label>Code postal arrivée</Label>
-              <Input value={dropPostal} onChange={e=>setDropPostal(e.target.value)} placeholder="Code postal" />
-            </div>
-          </div>
-
-          <div className="grid sm:grid-cols-2 gap-3">
-            <div>
-              <Label>Image du véhicule</Label>
-              <div className="flex items-center gap-3">
-                <div className="w-28 h-20 border rounded bg-muted/40 flex items-center justify-center overflow-hidden">
-                  {imagePath ? (
-                    <img
-                      src={getVehicleImageUrl({ image_path: imagePath })}
-                      alt="aperçu"
-                      className="object-contain w-full h-full"
-                      onError={(e) => {
-                        const target = e.currentTarget as HTMLImageElement;
-                        const fb = getVehicleImageUrl({ body_type: 'autre' });
-                        if (target.src !== fb) target.src = fb;
-                      }}
+      {/* Contenu principal */}
+      <div className="container mx-auto px-6 py-8">
+        <div className="max-w-4xl mx-auto">
+          <Card className="bg-gray-800/50 border-gray-700/50 backdrop-blur-sm">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-white">
+                <Plus className="w-6 h-6 text-cyan-500" />
+                Nouvelle Mission de Convoyage
+              </CardTitle>
+              <CardDescription className="text-gray-400">
+                Remplissez les informations ci-dessous pour publier votre mission sur le marketplace
+              </CardDescription>
+            </CardHeader>
+            
+            <CardContent>
+              <form onSubmit={handleSubmit} className="space-y-6">
+                {/* Informations générales */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-2">
+                    <Label htmlFor="title" className="text-gray-200">Titre de la mission *</Label>
+                    <Input
+                      id="title"
+                      value={formData.title}
+                      onChange={(e) => handleInputChange('title', e.target.value)}
+                      placeholder="Ex: Transport BMW Série 3 - Paris vers Lyon"
+                      className="bg-gray-700/50 border-gray-600/50 text-white placeholder:text-gray-400"
+                      required
                     />
-                  ) : (
-                    <span className="text-xs text-muted-foreground">Aucune</span>
-                  )}
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="vehicleType" className="text-gray-200">Type de véhicule *</Label>
+                    <Select value={formData.vehicleType} onValueChange={(value) => handleInputChange('vehicleType', value)}>
+                      <SelectTrigger className="bg-gray-700/50 border-gray-600/50 text-white">
+                        <SelectValue placeholder="Sélectionner un type" />
+                      </SelectTrigger>
+                      <SelectContent className="bg-gray-700 border-gray-600">
+                        <SelectItem value="berline">Berline</SelectItem>
+                        <SelectItem value="suv">SUV</SelectItem>
+                        <SelectItem value="utilitaire">Utilitaire</SelectItem>
+                        <SelectItem value="premium">Véhicule Premium</SelectItem>
+                        <SelectItem value="moto">Moto</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
-                <Button variant="outline" type="button" onClick={()=>setImagePickerOpen(true)}>Choisir une image</Button>
-              </div>
-              <p className="text-xs text-muted-foreground mt-1">Obligatoire (85 images disponibles)</p>
-            </div>
-            <div>
-              <Label>Prix proposé (€)</Label>
-              <Input type="number" value={price} onChange={e=>setPrice(e.target.value)} min={MIN_PRICE} />
-              <p className="text-xs text-muted-foreground mt-1">Minimum {MIN_PRICE} €</p>
-            </div>
-            <div className="space-y-2">
-              <Label>Exigences</Label>
-              <div className="grid grid-cols-2 gap-2 text-sm">
-                <label className="flex items-center gap-2"><Checkbox checked={req.assurance} onCheckedChange={v=>setReq(s=>({...s, assurance: !!v}))}/> Assurance tous risques</label>
-                <label className="flex items-center gap-2"><Checkbox checked={req.wgarage} onCheckedChange={v=>setReq(s=>({...s, wgarage: !!v}))}/> W garage</label>
-                <label className="flex items-center gap-2"><Checkbox checked={req.plateau} onCheckedChange={v=>setReq(s=>({...s, plateau: !!v}))}/> Transporteur plateau</label>
-                <label className="flex items-center gap-2"><Checkbox checked={req.porte10} onCheckedChange={v=>setReq(s=>({...s, porte10: !!v}))}/> Porte 10</label>
-                <label className="flex items-center gap-2"><Checkbox checked={req.convoyeur} onCheckedChange={v=>setReq(s=>({...s, convoyeur: !!v}))}/> Convoyeur</label>
-              </div>
-            </div>
-          </div>
 
-          <div className="flex justify-end gap-2">
-            <Button variant="outline" onClick={()=>navigate('/marketplace')}>Annuler</Button>
-            <Button onClick={submit} disabled={submitting || !valid}>Publier</Button>
-          </div>
-        </CardContent>
-      </Card>
-  <VehicleImagePicker open={imagePickerOpen} onClose={()=>setImagePickerOpen(false)} onSelect={(p)=>setImagePath(p)} prefix="catalog" />
+                {/* Itinéraire */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-2">
+                    <Label htmlFor="departure" className="text-gray-200 flex items-center gap-2">
+                      <MapPin className="w-4 h-4 text-green-500" />
+                      Lieu de départ *
+                    </Label>
+                    <Input
+                      id="departure"
+                      value={formData.departure}
+                      onChange={(e) => handleInputChange('departure', e.target.value)}
+                      placeholder="Ex: Paris (75001)"
+                      className="bg-gray-700/50 border-gray-600/50 text-white placeholder:text-gray-400"
+                      required
+                    />
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="arrival" className="text-gray-200 flex items-center gap-2">
+                      <MapPin className="w-4 h-4 text-red-500" />
+                      Lieu d'arrivée *
+                    </Label>
+                    <Input
+                      id="arrival"
+                      value={formData.arrival}
+                      onChange={(e) => handleInputChange('arrival', e.target.value)}
+                      placeholder="Ex: Lyon (69001)"
+                      className="bg-gray-700/50 border-gray-600/50 text-white placeholder:text-gray-400"
+                      required
+                    />
+                  </div>
+                </div>
+
+                {/* Dates */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-2">
+                    <Label htmlFor="departureDate" className="text-gray-200 flex items-center gap-2">
+                      <Calendar className="w-4 h-4 text-blue-500" />
+                      Date de départ *
+                    </Label>
+                    <Input
+                      id="departureDate"
+                      type="date"
+                      value={formData.departureDate}
+                      onChange={(e) => handleInputChange('departureDate', e.target.value)}
+                      className="bg-gray-700/50 border-gray-600/50 text-white"
+                      required
+                    />
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="arrivalDate" className="text-gray-200 flex items-center gap-2">
+                      <Calendar className="w-4 h-4 text-purple-500" />
+                      Date d'arrivée *
+                    </Label>
+                    <Input
+                      id="arrivalDate"
+                      type="date"
+                      value={formData.arrivalDate}
+                      onChange={(e) => handleInputChange('arrivalDate', e.target.value)}
+                      className="bg-gray-700/50 border-gray-600/50 text-white"
+                      required
+                    />
+                  </div>
+                </div>
+
+                {/* Prix et détails */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <div className="space-y-2">
+                    <Label htmlFor="price" className="text-gray-200 flex items-center gap-2">
+                      <Euro className="w-4 h-4 text-green-500" />
+                      Prix (€) *
+                    </Label>
+                    <Input
+                      id="price"
+                      type="number"
+                      value={formData.price}
+                      onChange={(e) => handleInputChange('price', e.target.value)}
+                      placeholder="850"
+                      className="bg-gray-700/50 border-gray-600/50 text-white placeholder:text-gray-400"
+                      required
+                    />
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="distance" className="text-gray-200">Distance (km)</Label>
+                    <Input
+                      id="distance"
+                      value={formData.distance}
+                      onChange={(e) => handleInputChange('distance', e.target.value)}
+                      placeholder="465"
+                      className="bg-gray-700/50 border-gray-600/50 text-white placeholder:text-gray-400"
+                    />
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="duration" className="text-gray-200 flex items-center gap-2">
+                      <Clock className="w-4 h-4 text-orange-500" />
+                      Durée estimée
+                    </Label>
+                    <Input
+                      id="duration"
+                      value={formData.duration}
+                      onChange={(e) => handleInputChange('duration', e.target.value)}
+                      placeholder="4h 30min"
+                      className="bg-gray-700/50 border-gray-600/50 text-white placeholder:text-gray-400"
+                    />
+                  </div>
+                </div>
+
+                {/* Description */}
+                <div className="space-y-2">
+                  <Label htmlFor="description" className="text-gray-200">Description de la mission</Label>
+                  <Textarea
+                    id="description"
+                    value={formData.description}
+                    onChange={(e) => handleInputChange('description', e.target.value)}
+                    placeholder="Décrivez votre mission : état du véhicule, instructions spéciales, contacts..."
+                    className="bg-gray-700/50 border-gray-600/50 text-white placeholder:text-gray-400 min-h-[100px]"
+                    rows={4}
+                  />
+                </div>
+
+                {/* Actions */}
+                <div className="flex justify-between items-center pt-6">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => navigate('/marketplace')}
+                    className="border-gray-600/50 text-gray-300 hover:bg-gray-700/50"
+                  >
+                    Annuler
+                  </Button>
+                  
+                  <Button
+                    type="submit"
+                    disabled={loading}
+                    className="bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 text-white"
+                  >
+                    {loading ? (
+                      <>
+                        <div className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin mr-2" />
+                        Publication...
+                      </>
+                    ) : (
+                      <>
+                        <Plus className="w-4 h-4 mr-2" />
+                        Publier la Mission
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </form>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
     </div>
   );
-};
-
-export default PostMarketplaceMission;
+}

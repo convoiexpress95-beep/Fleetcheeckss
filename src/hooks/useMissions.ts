@@ -3,12 +3,13 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-import { toast } from '@/hooks/use-toast';
+import { useToast } from '@/hooks';
 import { useEffect } from 'react';
 
 export const useMissions = (filters: any = {}, page = 0, pageSize = 10) => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
+  const { toast } = useToast();
 
   const query = useQuery({
     queryKey: ['missions', user?.id, filters, page, pageSize],
@@ -377,6 +378,7 @@ export const useMission = (id: string) => {
 export const useCreateMission = () => {
   const queryClient = useQueryClient();
   const { user } = useAuth();
+  const { toast } = useToast();
 
   return useMutation({
     mutationFn: async (mission: any) => {
@@ -415,25 +417,57 @@ export const useCreateMission = () => {
       return data;
     },
     onSuccess: () => {
+      // On laisse la version optimiste et on invalide pour rafraîchir les autres pages
       queryClient.invalidateQueries({ queryKey: ['missions'] });
       toast({
         title: "Mission créée",
         description: "La mission a été créée avec succès",
       });
     },
-    onError: (error: any) => {
+    onMutate: async (newMission: any) => {
+      if (!user?.id) return;
+      await queryClient.cancelQueries({ queryKey: ['missions'] });
+      const previous = queryClient.getQueriesData({ queryKey: ['missions'] });
+      // Insertion optimiste en tête
+      previous.forEach(([key, value]) => {
+        if (!value) return;
+        queryClient.setQueryData(key, (old: any) => {
+          if (!old) return old;
+          const optimisticMission = {
+            id: 'optimistic-' + Date.now(),
+            reference: 'PENDING',
+            created_by: user.id,
+            status: 'pending',
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+            donor_profile: { full_name: 'Moi', email: user.email },
+            driver_profile: null,
+            creator_profile: { full_name: 'Moi', email: user.email },
+            ...newMission,
+          };
+          return { ...old, data: [optimisticMission, ...(old.data||[])] };
+        });
+      });
+      return { previous };
+    },
+    onError: (error: any, _newMission, context: any) => {
+      context?.previous?.forEach(([key, val]: any) => queryClient.setQueryData(key, val));
       toast({
         title: "Erreur",
         description: error.message,
         variant: "destructive",
       });
     },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ['missions'] });
+    }
   });
 };
 
 export const useUpdateMission = () => {
   const queryClient = useQueryClient();
   const { user } = useAuth();
+  const { toast } = useToast();
 
   return useMutation({
     mutationFn: async ({ id, updates }: { id: string; updates: any }) => {
@@ -470,6 +504,7 @@ export const useUpdateMission = () => {
 export const useDeleteMission = () => {
   const queryClient = useQueryClient();
   const { user } = useAuth();
+  const { toast } = useToast();
 
   return useMutation({
     mutationFn: async (id: string) => {
@@ -503,6 +538,7 @@ export const useDeleteMission = () => {
 export const useArchiveMission = () => {
   const queryClient = useQueryClient();
   const { user } = useAuth();
+  const { toast } = useToast();
 
   return useMutation({
     mutationFn: async (id: string) => {
@@ -538,6 +574,7 @@ export const useArchiveMission = () => {
 export const useAssignMission = () => {
   const queryClient = useQueryClient();
   const { user } = useAuth();
+  const { toast } = useToast();
 
   return useMutation({
     mutationFn: async ({ id, driverId }: { id: string; driverId: string }) => {

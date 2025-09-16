@@ -9,8 +9,8 @@ import { useParams } from "react-router-dom";
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useConvoiturage } from "@/hooks/useConvoiturage";
-import { useToast } from "@/hooks/use-toast";
-import type { Ride } from "@/types/convoiturage";
+import { useToast } from "@/hooks";
+import type { Ride } from "../../types/convoiturage";
 
 const TripDetails = () => {
   const { id } = useParams();

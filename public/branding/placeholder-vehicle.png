@@ -1,0 +1,6 @@
+<svg width="200" height="100" viewBox="0 0 200 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="200" height="100" fill="#f8fafc" stroke="#e2e8f0" stroke-width="1"/>
+  <circle cx="60" cy="50" r="20" fill="#6366f1"/>
+  <text x="100" y="45" fill="#475569" font-family="Arial" font-size="14" font-weight="600">FleetCheck</text>
+  <text x="100" y="60" fill="#64748b" font-family="Arial" font-size="10">Transport Solutions</text>
+</svg>

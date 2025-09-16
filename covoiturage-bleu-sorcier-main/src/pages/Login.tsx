@@ -4,11 +4,18 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
+import { useAuth } from "@/hooks/useAuth";
 import { Car, Eye, EyeOff, Mail, Lock } from "lucide-react";
 
 const Login = () => {
   const [showPassword, setShowPassword] = useState(false);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const navigate = useNavigate();
+  const { signIn } = useAuth();
 
   return (
     <div className="min-h-screen gradient-hero flex items-center justify-center px-4">
@@ -37,6 +44,8 @@ const Login = () => {
                   type="email"
                   placeholder="votre@email.com"
                   className="pl-10"
+                  value={email}
+                  onChange={(e)=>setEmail(e.target.value)}
                 />
               </div>
             </div>
@@ -49,6 +58,8 @@ const Login = () => {
                   type={showPassword ? "text" : "password"}
                   placeholder="••••••••"
                   className="pl-10 pr-10"
+                  value={password}
+                  onChange={(e)=>setPassword(e.target.value)}
                 />
                 <Button
                   type="button"
@@ -67,9 +78,28 @@ const Login = () => {
             </div>
           </div>
 
-          <Button className="w-full" variant="hero" size="lg">
-            Se connecter
+          <Button
+            className="w-full"
+            variant="hero"
+            size="lg"
+            disabled={loading}
+            onClick={async () => {
+              setError(null);
+              setLoading(true);
+              const ok = await signIn(email, password);
+              setLoading(false);
+              if (!ok) {
+                setError("Email ou mot de passe invalide.");
+                return;
+              }
+              navigate("/");
+            }}
+          >
+            {loading ? "Connexion…" : "Se connecter"}
           </Button>
+          {error && (
+            <p className="text-sm text-red-600 text-center">{error}</p>
+          )}
 
           <div className="text-center">
             <Link 

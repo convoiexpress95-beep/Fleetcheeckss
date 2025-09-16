@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Truck, Sparkles, Lock, Mail, User, ArrowLeft } from 'lucide-react';
+import { Truck, Sparkles, Lock, Mail, User, ArrowLeft, Briefcase, UserCheck, Shield } from 'lucide-react';
 
 const Login = () => {
   const { signIn, signUp, user } = useAuth();
@@ -18,6 +18,10 @@ const Login = () => {
   const [signupForm, setSignupForm] = useState({ email: '', password: '', fullName: '' });
 
   const from = location.state?.from?.pathname || '/dashboard';
+
+  // Nouveau: persona depuis query
+  const params = new URLSearchParams(location.search);
+  const persona = (params.get('role') as 'entreprise' | 'convoyeur' | 'client' | null) ?? null;
 
   // Redirect if already logged in
   useEffect(() => {
@@ -46,11 +50,32 @@ const Login = () => {
     const { error } = await signUp(signupForm.email, signupForm.password, signupForm.fullName);
     
     if (!error) {
-      // Don't navigate immediately for signup - user needs to verify email
+      // Invite l'utilisateur à compléter son profil
+      navigate('/onboarding');
     }
     
     setIsLoading(false);
   };
+
+  const personaBanner = persona && (
+    <div className="mb-6">
+      <div className="rounded-xl border border-white/10 bg-white/5 p-4 text-foreground">
+        <div className="flex items-center gap-2 font-semibold">
+          {persona === 'entreprise' && <Briefcase className="w-4 h-4" />} 
+          {persona === 'convoyeur' && <UserCheck className="w-4 h-4" />} 
+          {persona === 'client' && <Shield className="w-4 h-4" />}
+          {persona === 'entreprise' && <span>Connexion Entreprise</span>}
+          {persona === 'convoyeur' && <span>Connexion Convoyeur</span>}
+          {persona === 'client' && <span>Espace Client</span>}
+        </div>
+        <p className="text-sm text-muted-foreground mt-1">
+          {persona === 'entreprise' && "Gérez vos équipes, missions, inspections et factures."}
+          {persona === 'convoyeur' && "Accédez à vos missions, suivez vos trajets et envoyez les rapports."}
+          {persona === 'client' && "Consultez le suivi, les rapports photo et la preuve de livraison."}
+        </p>
+      </div>
+    </div>
+  );
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-purple-900/20 to-blue-900/30 px-4 relative overflow-hidden">
@@ -80,6 +105,7 @@ const Login = () => {
             <CardDescription className="text-muted-foreground">
               Connectez-vous ou créez un compte pour accéder à FleetCheecks
             </CardDescription>
+            {personaBanner}
           </CardHeader>
           <CardContent>
             <Tabs defaultValue="login" className="w-full">

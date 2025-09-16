@@ -13,7 +13,8 @@ export default defineConfig(({ mode }) => {
       __BUILD_TIME__: JSON.stringify(new Date().toISOString()),
     },
     server: {
-      host: "::",
+      // Lier en IPv4 pour éviter les soucis de "localhost" qui pointe sur ::1
+      host: "127.0.0.1",
       port: 8086,
       proxy: {
         "/supabase": {
@@ -45,6 +46,8 @@ export default defineConfig(({ mode }) => {
       alias: {
         "@": path.resolve(__dirname, "./src"),
       },
+  // Empêcher une éventuelle double instance de React (micro-sous-projets / symlinks) qui casserait les Context
+  dedupe: ["react", "react-dom"],
     },
   };
 });

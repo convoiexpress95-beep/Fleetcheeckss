@@ -1,33 +1,7 @@
-import { useToast } from "@/hooks/use-toast"
-import {
-  Toast,
-  ToastClose,
-  ToastDescription,
-  ToastProvider,
-  ToastTitle,
-  ToastViewport,
-} from "@/components/ui/toast"
+// Ancienne implémentation shadcn supprimée: l'affichage est désormais géré directement
+// dans ToastProvider (src/hooks/use-toast.tsx). Ce composant devient un alias pratique.
+import { ToastProvider } from '@/hooks';
 
-export function Toaster() {
-  const { toasts } = useToast()
-
-  return (
-    <ToastProvider>
-      {toasts.map(function ({ id, title, description, action, ...props }) {
-        return (
-          <Toast key={id} {...props}>
-            <div className="grid gap-1">
-              {title && <ToastTitle>{title}</ToastTitle>}
-              {description && (
-                <ToastDescription>{description}</ToastDescription>
-              )}
-            </div>
-            {action}
-            <ToastClose />
-          </Toast>
-        )
-      })}
-      <ToastViewport />
-    </ToastProvider>
-  )
+export function Toaster({ children }: { children?: React.ReactNode }) {
+  return <ToastProvider>{children}</ToastProvider>;
 }

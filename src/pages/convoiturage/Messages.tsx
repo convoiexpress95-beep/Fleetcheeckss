@@ -9,7 +9,7 @@ import { Send, Search, Phone, MoreVertical, MapPin } from "lucide-react";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
-import type { ConversationItem, UIMessageItem, Ride, RideMessageRow } from "@/types/convoiturage";
+import type { ConversationItem, UIMessageItem, Ride, RideMessageRow } from "../../types/convoiturage";
 
 const Messages = () => {
   const [selectedConversation, setSelectedConversation] = useState<string | null>(null);

@@ -1,6 +1,6 @@
 import type React from "react";
 // Centralise les URLs du logo (local + fallback distant)
-export const BRAND_NAME = "FleetChecks";
+export const BRAND_NAME = "FleetCheecks";
 // Utilise directement le logo distant pour le web (remplace l'ancien /branding/logo.png)
 export const BRAND_LOGO_LOCAL = "https://i.ibb.co/xqf1LCDC/Chat-GPT-Image-6-sept-2025-01-04-56.png";
 export const BRAND_LOGO_REMOTE = "https://i.ibb.co/xqf1LCDC/Chat-GPT-Image-6-sept-2025-01-04-56.png";

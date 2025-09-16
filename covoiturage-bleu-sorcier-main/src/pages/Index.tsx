@@ -2,9 +2,12 @@ import { Header } from "@/components/Header";
 import { SearchForm } from "@/components/SearchForm";
 import { TripList } from "@/components/TripList";
 import { Button } from "@/components/ui/button";
+import { Link } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";
-import heroImage from "@/assets/hero-carpooling.jpg";
 import { Car, Shield, Users, Leaf } from "lucide-react";
+
+// Utilise l'image locale depuis le dossier public
+const heroImage = "/hero-carpooling-Cms9o9bC.jpg";
 
 const Index = () => {
   return (
@@ -31,12 +34,14 @@ const Index = () => {
               avec une communauté de confiance.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Button variant="hero" size="lg" className="text-lg px-8 py-6">
-                <Car className="w-5 h-5" />
-                Trouver un trajet
+              <Button variant="hero" size="lg" className="text-lg px-8 py-6" asChild>
+                <Link to="/">
+                  <Car className="w-5 h-5" />
+                  Trouver un trajet
+                </Link>
               </Button>
-              <Button variant="outline" size="lg" className="text-lg px-8 py-6">
-                Publier un trajet
+              <Button variant="outline" size="lg" className="text-lg px-8 py-6" asChild>
+                <Link to="/publish">Publier un trajet</Link>
               </Button>
             </div>
           </div>

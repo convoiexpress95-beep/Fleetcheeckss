@@ -5,8 +5,10 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
+import { listTrajets, remainingSeats, isFull, publishTrajet } from '@/services/trajetsPartages';
+import { requestJoinTrajet, listPassengerRequests } from '@/services/trajetDemands';
 import { supabase } from '@/integrations/supabase/client';
-import { useToast } from '@/hooks/use-toast';
+import { useToast } from '@/hooks';
 import { useAuth } from '@/contexts/AuthContext';
 import { CreditsDisplay } from '@/components/CreditsDisplay';
 
@@ -46,17 +48,15 @@ const TrajetsPartages = () => {
     prix_par_place: '',
     notes: ''
   });
+  // Statut des demandes de l'utilisateur pour chaque trajet: pending | accepted | refused | expired
+  const [requestStatuses, setRequestStatuses] = useState<Record<string, 'pending' | 'accepted' | 'refused' | 'expired'>>({});
+  const [creditsRefreshToken, setCreditsRefreshToken] = useState(0);
 
   const fetchItems = async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase
-  .from('trajets_partages')
-  .select('id, convoyeur_id, ville_depart, ville_arrivee, date_heure, nb_places, prix_par_place, participants, created_at, start_lat, start_lng, end_lat, end_lng')
-        .order('date_heure', { ascending: true })
-        .limit(100);
-      if (error) throw error;
-      setItems((data || []) as unknown as Trajet[]);
+      const rows = await listTrajets(100);
+      setItems(rows as Trajet[]);
     } catch (e) {
       console.error(e);
     } finally {
@@ -67,6 +67,50 @@ const TrajetsPartages = () => {
   React.useEffect(() => {
     fetchItems();
   }, []);
+
+  // Charger demandes existantes pour marquer statuts en attente / refusés / etc.
+  React.useEffect(() => {
+    (async () => {
+      if (!user) return;
+      try {
+        const reqs = await listPassengerRequests(user.id);
+        const map: Record<string, 'pending' | 'accepted' | 'refused' | 'expired'> = {};
+        for (const r of reqs) map[r.trajet_id] = r.status;
+        setRequestStatuses(map);
+      } catch (e) {
+        console.warn('Chargement demandes passager échoué', e);
+      }
+    })();
+  }, [user]);
+
+  // Realtime: suivi des changements sur les demandes de l'utilisateur
+  React.useEffect(() => {
+    if (!user) return;
+    const channel = supabase.channel(`trajet_requests_passenger_${user.id}`)
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'trajet_join_requests',
+        filter: `passenger_id=eq.${user.id}`
+      }, (payload: any) => {
+        setRequestStatuses(prev => {
+          const next = { ...prev };
+          const row = (payload.new || payload.old);
+            // payload.new existe pour INSERT & UPDATE; pour DELETE on garderait ancien statut (rare car RLS interdit delete)
+          if (payload.eventType === 'DELETE') return next; // pas censé arriver
+          if (row?.trajet_id && row?.status) {
+            next[row.trajet_id] = row.status;
+          }
+          return next;
+        });
+      });
+    channel.subscribe(status => {
+      if (status === 'SUBSCRIBED') {
+        // Optionnel: console.debug('Realtime demandes abonné');
+      }
+    });
+    return () => { supabase.removeChannel(channel); };
+  }, [user]);
 
   const haversineKm = (a: { lat: number; lng: number }, b: { lat: number; lng: number }) => {
     const R = 6371; // km
@@ -168,16 +212,15 @@ const TrajetsPartages = () => {
     }
     setSaving(true);
     try {
-      const { error } = await supabase.from('trajets_partages').insert({
+      await publishTrajet({
         convoyeur_id: user.id,
         ville_depart: publishForm.ville_depart.trim(),
         ville_arrivee: publishForm.ville_arrivee.trim(),
-        date_heure: new Date(publishForm.date_heure).toISOString(),
+        date_heure: publishForm.date_heure,
         nb_places: Number(nb_places),
         prix_par_place: publishForm.prix_par_place ? Number(publishForm.prix_par_place) : null,
-        participants: [],
+        description: publishForm.notes || undefined,
       });
-      if (error) throw error;
       toast({ title: 'Trajet publié', description: 'Votre trajet est visible pour les autres convoyeurs.' });
       setPublishOpen(false);
       setPublishForm({ ville_depart: '', ville_arrivee: '', date_heure: '', nb_places: 1, prix_par_place: '', notes: '' });
@@ -195,18 +238,25 @@ const TrajetsPartages = () => {
       toast({ title: 'Authentification requise', description: 'Connectez-vous pour rejoindre un trajet.', variant: 'destructive' });
       return;
     }
+    if ((t.participants || []).includes(user.id)) return; // déjà inscrit
+    if (requestStatuses[t.id] === 'pending') return; // déjà en attente
+    if (isFull(t as any)) {
+      toast({ title: 'Trajet complet', description: 'Plus de place disponible.', variant: 'destructive' });
+      return;
+    }
     setSaving(true);
     try {
-      const { error } = await supabase
-        .from('trajets_partages')
-        .update({ participants: (t.participants || []).includes(user.id) ? t.participants : [...(t.participants || []), user.id] })
-        .eq('id', t.id);
-      if (error) throw error;
-      toast({ title: 'Demande envoyée', description: 'Le convoyeur propriétaire sera notifié.' });
-      fetchItems();
+      await requestJoinTrajet(t.id);
+      setRequestStatuses(prev => ({ ...prev, [t.id]: 'pending' }));
+      setCreditsRefreshToken(x => x + 1); // déclenche refresh CreditsDisplay
+      toast({ title: 'Demande en attente', description: 'En attente d’acceptation du conducteur.' });
     } catch (e: any) {
       console.error(e);
-      toast({ title: 'Erreur', description: e.message || 'Impossible de rejoindre le trajet.', variant: 'destructive' });
+      if (e?.message === 'CREDITS_INSUFFISANTS') {
+        toast({ title: 'Crédits insuffisants', description: 'Il vous faut au moins 2 crédits pour réserver.', variant: 'destructive' });
+      } else {
+        toast({ title: 'Erreur', description: e.message || 'Impossible de créer la demande.', variant: 'destructive' });
+      }
     } finally {
       setSaving(false);
     }
@@ -224,7 +274,7 @@ const TrajetsPartages = () => {
             <p className="text-muted-foreground">Optimisez les retours à vide • Publication et adhésion gratuites</p>
           </div>
           <div className="ml-auto flex items-center gap-3">
-            <CreditsDisplay variant="compact" />
+            <CreditsDisplay variant="compact" refreshSignal={creditsRefreshToken} />
             <Button onClick={onPublish}><Plus className="w-4 h-4 mr-1" /> Publier trajet</Button>
           </div>
         </div>
@@ -251,21 +301,51 @@ const TrajetsPartages = () => {
               <div className="text-center text-muted-foreground py-8">Aucun trajet pour le moment</div>
             ) : (
               <div className="space-y-3">
-                {filtered.map((t) => (
-                  <div key={t.id} className="flex items-center justify-between border rounded-lg p-3 bg-card">
-                    <div className="min-w-0">
-                      <div className="font-semibold text-foreground truncate">{t.ville_depart} → {t.ville_arrivee}</div>
-                      <div className="text-sm text-muted-foreground truncate">
-                        {new Date(t.date_heure).toLocaleString()} • {t.nb_places} place(s) • {t.prix_par_place ? `${t.prix_par_place.toFixed(2)} € / place` : '—'}
+                {filtered.map((t) => {
+                  const seatsLeft = remainingSeats(t as any);
+                  const already = (t.participants || []).includes(user?.id || '__');
+                  const full = seatsLeft === 0 || isFull(t as any);
+                  const status = requestStatuses[t.id];
+                  const pending = status === 'pending';
+                  return (
+                    <div key={t.id} className={`flex items-center justify-between border rounded-lg p-3 bg-card ${full ? 'opacity-70' : ''}`}>
+                      <div className="min-w-0">
+                        <div className="font-semibold text-foreground truncate flex items-center gap-2">
+                          <span>{t.ville_depart} → {t.ville_arrivee}</span>
+                          {full && <span className="text-xs px-2 py-0.5 rounded bg-red-100 text-red-700 uppercase tracking-wide">Complet</span>}
+                          {!already && status && status !== 'pending' && (
+                            <span
+                              className={`text-xs px-2 py-0.5 rounded uppercase tracking-wide ${
+                                status === 'accepted' ? 'bg-green-100 text-green-700' :
+                                status === 'refused' ? 'bg-yellow-100 text-yellow-700' :
+                                status === 'expired' ? 'bg-gray-200 text-gray-700' : ''
+                              }`}
+                            >
+                              {status === 'accepted' ? 'Accepté' : status === 'refused' ? 'Refusé' : status === 'expired' ? 'Expiré' : ''}
+                            </span>
+                          )}
+                          {pending && <span className="text-xs px-2 py-0.5 rounded bg-blue-100 text-blue-700 uppercase tracking-wide">En attente</span>}
+                        </div>
+                        <div className="text-sm text-muted-foreground truncate flex flex-wrap gap-2 items-center">
+                          <span>{new Date(t.date_heure).toLocaleString()}</span>
+                          <span>• {t.nb_places} places</span>
+                          <span>• Restant: {seatsLeft}</span>
+                          <span>• {t.prix_par_place ? `${t.prix_par_place.toFixed(2)} € / place` : '—'}</span>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          size="sm"
+                          variant={already ? 'secondary' : pending ? 'secondary' : status === 'refused' || status === 'expired' ? 'outline' : 'outline'}
+                          disabled={already || full || saving || pending || status === 'refused' || status === 'expired' || status === 'accepted'}
+                          onClick={() => onJoin(t)}
+                        >
+                          <Users className="w-4 h-4 mr-1" /> {already ? 'Inscrit' : full ? 'Complet' : pending ? 'En attente' : status === 'refused' ? 'Refusé' : status === 'expired' ? 'Expiré' : status === 'accepted' ? 'Accepté' : 'Demander'}
+                        </Button>
                       </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <Button size="sm" variant="outline" onClick={() => onJoin(t)}>
-                        <Users className="w-4 h-4 mr-1" /> Rejoindre
-                      </Button>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </CardContent>

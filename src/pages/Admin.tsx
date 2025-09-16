@@ -1,10 +1,9 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { useToast } from "@/hooks/use-toast";
+import { useToast } from "@/hooks";
 import { AdminRoute } from "@/components/AdminRoute";
 import { supabase } from "@/integrations/supabase/client";
 import { useAllProfiles } from "@/hooks/useAllProfiles";
-import { useMissions } from "@/hooks/useMissions";
 import { useNotifications } from "@/hooks/useNotifications";
 import { useSubscription } from "@/hooks/useSubscription";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -15,56 +14,10 @@ import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
-import {
-  Users,
-  Truck,
-  Settings,
-  Crown,
-  Shield,
-  Database,
-  Bell,
-  Mail,
-  FileText,
-  CreditCard,
-  Activity,
-  BarChart3,
-  UserPlus,
-  Trash2,
-  Edit3,
-  Eye,
-  AlertTriangle,
-  CheckCircle,
-  XCircle,
-  Server,
-  HardDrive,
-  Wifi
-} from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { Users, Settings, Crown, Shield, Database, Bell, Mail, FileText, CreditCard, Activity, BarChart3, UserPlus, Trash2, Edit3, Eye, AlertTriangle, CheckCircle, XCircle, Server, HardDrive, Wifi, Truck } from "lucide-react";
 import { VehicleModelsManager } from "@/components/VehicleModelsManager";
 
 interface RealTimeStats {
@@ -80,6 +33,12 @@ export default function Admin() {
   const [notifications, setNotifications] = useState(true);
   const [maintenance, setMaintenance] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [maintenanceBanner, setMaintenanceBanner] = useState<string | null>(null);
+  const [topupUserId, setTopupUserId] = useState<string>("");
+  const [topupAmount, setTopupAmount] = useState<number>(10);
+  const [membershipPlan, setMembershipPlan] = useState<'debutant'|'pro'|'expert'|'entreprise'>('debutant');
+  const [roleToGrant, setRoleToGrant] = useState<'admin'|'moderator'|'debutant'|'pro'|'expert'|'entreprise'|'convoyeur_confirme'>('debutant');
+  const [convoyeurConfirmed, setConvoyeurConfirmed] = useState<boolean>(false);
   const [systemStats, setSystemStats] = useState<RealTimeStats | null>(null);
   const [adminSettings, setAdminSettings] = useState({
     sessionDuration: 60,
@@ -93,14 +52,10 @@ export default function Admin() {
   const navigate = useNavigate();
   const { toast } = useToast();
   
-  // Utiliser les hooks existants pour les données réelles
   const { data: realUsers = [], isLoading: usersLoading } = useAllProfiles();
-  const { data: missionsData, isLoading: missionsLoading } = useMissions();
   const { data: systemNotifications } = useNotifications();
   const { data: subscription } = useSubscription();
   
-  const realMissions = missionsData?.data || [];
-
   // Charger les statistiques en temps réel
   useEffect(() => {
     const loadSystemStats = async () => {
@@ -113,28 +68,24 @@ export default function Admin() {
         
         if (userError) throw userError;
 
-        // Statistiques missions
-        const { data: missionStats, error: missionError } = await supabase
-          .from('missions')
-          .select('status, donor_earning, driver_earning');
-        
-        if (missionError) throw missionError;
-
-        // Calculer les revenus totaux
-        const totalRevenue = missionStats?.reduce((acc, mission) => 
-          acc + (mission.donor_earning || 0) + (mission.driver_earning || 0), 0
-        ) || 0;
-
-        const completedMissions = missionStats?.filter(m => m.status === 'completed').length || 0;
+        const totalRevenue = 0;
+        const completedMissions = 0;
 
         setSystemStats({
           totalUsers: realUsers.length,
           activeUsers: userStats?.length || 0,
-          totalMissions: missionStats?.length || 0,
+          totalMissions: 0,
           completedMissions,
           totalRevenue,
           systemHealth: 'healthy'
         });
+
+        // Charger état maintenance
+        const { data: maint } = await supabase.from('maintenance_flags').select('*').maybeSingle();
+        if (maint) {
+          setMaintenance(!!maint.enabled);
+          setMaintenanceBanner(maint.message || null);
+        }
 
       } catch (error) {
         console.error('Erreur chargement statistiques:', error);
@@ -148,10 +99,10 @@ export default function Admin() {
       }
     };
 
-    if (!usersLoading && !missionsLoading) {
+    if (!usersLoading) {
       loadSystemStats();
     }
-  }, [realUsers, realMissions, usersLoading, missionsLoading, toast]);
+  }, [realUsers, usersLoading, toast]);
 
   // Fonctions d'administration
   const handleDeleteUser = async (userId: string) => {
@@ -174,7 +125,7 @@ export default function Admin() {
   const handleSystemMaintenance = async (enable: boolean) => {
     try {
       setMaintenance(enable);
-      // Ici vous pourriez mettre à jour une table de configuration système
+      await supabase.rpc('set_maintenance', { p_enabled: enable, p_message: maintenanceBanner });
       toast({
         title: enable ? "Mode maintenance activé" : "Mode maintenance désactivé",
         description: enable ? 
@@ -188,6 +139,63 @@ export default function Admin() {
         description: "Impossible de modifier le mode maintenance",
         variant: "destructive"
       });
+    }
+  };
+
+  const handleTopup = async () => {
+    if (!topupUserId || topupAmount <= 0) {
+      toast({ title: 'Champs requis', description: 'Sélectionnez un utilisateur et un montant > 0.', variant: 'destructive' });
+      return;
+    }
+    try {
+      const { error } = await supabase.rpc('admin_topup_credits', { p_user: topupUserId, p_amount: topupAmount, p_reason: 'admin_topup' });
+      if (error) throw error;
+      toast({ title: 'Crédits ajoutés', description: `${topupAmount} crédits ajoutés.` });
+    } catch (e:any) {
+      console.error(e);
+      toast({ title: 'Échec topup', description: e.message || 'Vérifiez vos droits admin.', variant: 'destructive' });
+    }
+  };
+
+  const handleSetMembership = async () => {
+    if (!topupUserId) {
+      toast({ title: 'Sélection requise', description: 'Choisissez un utilisateur.', variant: 'destructive' });
+      return;
+    }
+    try {
+      const { error } = await supabase.rpc('admin_set_membership', { p_user: topupUserId, p_plan: membershipPlan, p_expires_at: null });
+      if (error) throw error;
+      toast({ title: 'Abonnement mis à jour', description: `Plan ${membershipPlan} assigné.` });
+    } catch (e:any) {
+      toast({ title: 'Échec abonnement', description: e.message || 'Vérifiez vos droits admin.', variant: 'destructive' });
+    }
+  };
+
+  const handleSetRole = async (grant: boolean) => {
+    if (!topupUserId) {
+      toast({ title: 'Sélection requise', description: 'Choisissez un utilisateur.', variant: 'destructive' });
+      return;
+    }
+    try {
+      const { error } = await supabase.rpc('admin_set_role', { p_user: topupUserId, p_role: roleToGrant, p_grant: grant });
+      if (error) throw error;
+      toast({ title: grant ? 'Rôle attribué' : 'Rôle retiré', description: `${roleToGrant}` });
+    } catch (e:any) {
+      toast({ title: 'Échec rôle', description: e.message || 'Vérifiez vos droits admin.', variant: 'destructive' });
+    }
+  };
+
+  const handleConvoyeurConfirm = async () => {
+    if (!topupUserId) {
+      toast({ title: 'Sélection requise', description: 'Choisissez un utilisateur.', variant: 'destructive' });
+      return;
+    }
+    try {
+      const { error } = await supabase.rpc('admin_mark_convoyeur_confirme', { p_user: topupUserId, p_confirmed: convoyeurConfirmed });
+      if (error) throw error;
+      toast({ title: 'Statut convoyeur', description: convoyeurConfirmed ? 'Marqué confirmé + badge vérifié' : 'Marqué non confirmé' });
+    } catch (e:any) {
+      toast({ title: 'Échec statut convoyeur', description: e.message || 'Vérifiez vos droits admin.', variant: 'destructive' });
     }
   };
 
@@ -207,14 +215,14 @@ export default function Admin() {
     }
   };
 
-  if (loading || usersLoading || missionsLoading) {
+  if (loading || usersLoading) {
     return (
-      <div className="min-h-screen bg-background p-6 flex items-center justify-center">
+      <div className="p-6 flex items-center justify-center">
         <div className="text-center space-y-4">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
           <p className="text-lg font-medium">Chargement des données d'administration...</p>
           <p className="text-sm text-muted-foreground">
-            Récupération des statistiques système en temps réel
+            Récupération des statistiques système
           </p>
         </div>
       </div>
@@ -230,32 +238,17 @@ export default function Admin() {
       trend: "+12% ce mois"
     },
     { 
-      label: "Missions ce mois", 
-      value: systemStats?.totalMissions?.toString() || "0", 
-      icon: Truck, 
-      color: "text-green-500",
-      trend: "+8% vs mois dernier"
-    },
-    { 
       label: "Revenus totaux", 
       value: `€${systemStats?.totalRevenue?.toLocaleString() || "0"}`, 
       icon: CreditCard, 
       color: "text-accent",
-      trend: "+23% ce trimestre"
-    },
-    { 
-      label: "Taux de réussite", 
-      value: systemStats?.completedMissions && systemStats?.totalMissions ? 
-        `${((systemStats.completedMissions / systemStats.totalMissions) * 100).toFixed(1)}%` : "0%", 
-      icon: BarChart3, 
-      color: "text-orange-500",
-      trend: "Objectif atteint"
+      trend: "+0% (missions désactivées)"
     },
   ];
 
   return (
     <AdminRoute>
-      <div className="min-h-screen bg-background p-6">
+      <div className="p-6">
         <div className="max-w-7xl mx-auto space-y-8">
         {/* Header */}
         <div className="space-y-2">
@@ -289,11 +282,11 @@ export default function Admin() {
         </div>
 
         {/* Alertes système */}
-        {maintenance && (
+    {maintenance && (
           <Alert className="border-destructive bg-destructive/10">
             <AlertTriangle className="h-4 w-4" />
             <AlertDescription className="font-medium">
-              Mode maintenance activé - Les utilisateurs ne peuvent pas accéder à certaines fonctionnalités
+      Mode maintenance activé - Les utilisateurs ne peuvent pas accéder à certaines fonctionnalités{maintenanceBanner ? ` — ${maintenanceBanner}` : ''}
             </AlertDescription>
           </Alert>
         )}
@@ -320,14 +313,10 @@ export default function Admin() {
 
         {/* Main Admin Tabs */}
         <Tabs defaultValue="users" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-6 glass-card">
+          <TabsList className="grid w-full grid-cols-5 glass-card">
             <TabsTrigger value="users" className="flex items-center gap-2">
               <Users className="w-4 h-4" />
               Utilisateurs ({realUsers.length})
-            </TabsTrigger>
-            <TabsTrigger value="missions" className="flex items-center gap-2">
-              <Truck className="w-4 h-4" />
-              Missions ({realMissions.length})
             </TabsTrigger>
             <TabsTrigger value="settings" className="flex items-center gap-2">
               <Settings className="w-4 h-4" />
@@ -448,86 +437,6 @@ export default function Admin() {
               </CardHeader>
               <CardContent>
                 <VehicleModelsManager />
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          {/* Missions Management - Données réelles */}
-          <TabsContent value="missions" className="space-y-6">
-            <Card className="glass-card">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Truck className="w-5 h-5" />
-                  Gestion des missions réelles
-                </CardTitle>
-                <CardDescription>
-                  {realMissions.length} missions en base de données
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Référence</TableHead>
-                      <TableHead>Titre</TableHead>
-                      <TableHead>Statut</TableHead>
-                      <TableHead>Date</TableHead>
-                      <TableHead>Revenus</TableHead>
-                      <TableHead>Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {realMissions.slice(0, 10).map((mission) => (
-                      <TableRow key={mission.id}>
-                        <TableCell className="font-medium font-mono">
-                          {mission.reference}
-                        </TableCell>
-                        <TableCell>{mission.title}</TableCell>
-                        <TableCell>
-                          <Badge 
-                            variant={
-                              mission.status === "completed" ? "default" :
-                              mission.status === "in_progress" ? "secondary" : 
-                              "outline"
-                            }
-                          >
-                            {mission.status === "completed" ? "Terminé" :
-                             mission.status === "in_progress" ? "En cours" :
-                             mission.status === "pending" ? "En attente" : "Planifié"}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          {mission.pickup_date ? 
-                            new Date(mission.pickup_date).toLocaleDateString('fr-FR') : 
-                            'Non planifié'}
-                        </TableCell>
-                        <TableCell>
-                          €{((mission.donor_earning || 0) + (mission.driver_earning || 0)).toFixed(2)}
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex gap-2">
-                            <Button 
-                              variant="ghost" 
-                              size="sm" 
-                              onClick={() => navigate(`/missions/${mission.id}`)}
-                              title="Voir les détails"
-                            >
-                              <Eye className="w-4 h-4" />
-                            </Button>
-                            <Button 
-                              variant="ghost" 
-                              size="sm" 
-                              onClick={() => navigate(`/missions/${mission.id}/edit`)}
-                              title="Éditer"
-                            >
-                              <Edit3 className="w-4 h-4" />
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
               </CardContent>
             </Card>
           </TabsContent>
@@ -671,7 +580,7 @@ export default function Admin() {
                   </div>
                   <div className="space-y-2">
                     <Label>Message de maintenance</Label>
-                    <Input placeholder="Maintenance programmée en cours..." />
+                    <Input placeholder="Maintenance programmée en cours..." value={maintenanceBanner || ''} onChange={(e)=>setMaintenanceBanner(e.target.value)} onBlur={()=> maintenance && handleSystemMaintenance(true)} />
                   </div>
                   <Alert>
                     <AlertTriangle className="h-4 w-4" />
@@ -679,6 +588,91 @@ export default function Admin() {
                       Le mode maintenance bloque l'accès aux utilisateurs non administrateurs
                     </AlertDescription>
                   </Alert>
+                </CardContent>
+              </Card>
+
+              <Card className="glass-card">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <CreditCard className="w-5 h-5" />
+                    Créditer des comptes (admin)
+                  </CardTitle>
+                  <CardDescription>Ajoutez des crédits aux utilisateurs via la fonction sécurisée.</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="space-y-2">
+                    <Label>Utilisateur</Label>
+                    <Select value={topupUserId} onValueChange={setTopupUserId}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Choisir un utilisateur" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {realUsers.map(u => (
+                          <SelectItem key={u.user_id} value={u.user_id}>{u.full_name || u.email}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Montant</Label>
+                    <Input type="number" min={1} value={topupAmount} onChange={(e)=>setTopupAmount(parseInt(e.target.value)||0)} />
+                  </div>
+                  <Button onClick={handleTopup} className="w-full">Ajouter les crédits</Button>
+                </CardContent>
+              </Card>
+
+              <Card className="glass-card">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Shield className="w-5 h-5" />
+                    Abonnements & Rôles
+                  </CardTitle>
+                  <CardDescription>Attribuez un plan et gérez les rôles.</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="space-y-2">
+                    <Label>Plan d'abonnement</Label>
+                    <Select value={membershipPlan} onValueChange={(v:any)=>setMembershipPlan(v)}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Choisir un plan" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="debutant">Débutant</SelectItem>
+                        <SelectItem value="pro">Pro</SelectItem>
+                        <SelectItem value="expert">Expert</SelectItem>
+                        <SelectItem value="entreprise">Entreprise</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <Button onClick={handleSetMembership} className="w-full">Appliquer le plan</Button>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Rôle</Label>
+                    <Select value={roleToGrant} onValueChange={(v:any)=>setRoleToGrant(v)}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Choisir un rôle" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="debutant">Débutant</SelectItem>
+                        <SelectItem value="pro">Pro</SelectItem>
+                        <SelectItem value="expert">Expert</SelectItem>
+                        <SelectItem value="entreprise">Entreprise</SelectItem>
+                        <SelectItem value="moderator">Modérateur</SelectItem>
+                        <SelectItem value="admin">Admin</SelectItem>
+                        <SelectItem value="convoyeur_confirme">Convoyeur confirmé</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <div className="grid grid-cols-2 gap-2">
+                      <Button onClick={()=>handleSetRole(true)} variant="secondary">Attribuer</Button>
+                      <Button onClick={()=>handleSetRole(false)} variant="outline">Retirer</Button>
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Convoyeur confirmé (badge vérifié)</Label>
+                    <div className="flex items-center gap-2">
+                      <Switch checked={convoyeurConfirmed} onCheckedChange={setConvoyeurConfirmed} />
+                      <Button onClick={handleConvoyeurConfirm} variant="default">Enregistrer statut</Button>
+                    </div>
+                  </div>
                 </CardContent>
               </Card>
             </div>
@@ -785,7 +779,6 @@ export default function Admin() {
                   <Label className="text-base font-semibold">Tables actives</Label>
                   <div className="grid grid-cols-2 md:grid-cols-3 gap-2 mt-2">
                     <Badge variant="outline">profiles ({realUsers.length})</Badge>
-                    <Badge variant="outline">missions ({realMissions.length})</Badge>
                     <Badge variant="outline">notifications</Badge>
                     <Badge variant="outline">subscriptions</Badge>
                     <Badge variant="outline">contacts</Badge>
