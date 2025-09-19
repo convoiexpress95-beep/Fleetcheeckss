@@ -9,6 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import UserAvatar from '@/components/UserAvatar';
 import { Separator } from '@/components/ui/separator';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { PushNotificationSettings } from '@/components/PushNotificationSettings';
@@ -463,23 +464,26 @@ const Settings = () => {
                         {profile?.full_name?.charAt(0) || user.email?.charAt(0)?.toUpperCase()}
                       </AvatarFallback>
                     </Avatar>
-                    <Button
-                      size="sm"
-                      className="absolute -bottom-2 -right-2 rounded-full bg-gradient-cosmic hover:scale-110 transition-all"
-                      onClick={() => document.getElementById('avatar-upload')?.click()}
-                    >
-                      <Camera className="w-4 h-4" />
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="destructive"
-                      className="absolute -bottom-2 -left-2 rounded-full hover:scale-110 transition-all"
-                      onClick={deleteAvatar}
-                      disabled={loading}
-                      title="Supprimer l'avatar"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
+                    <UserAvatar src={previewUrl || undefined} name={profile?.full_name || user.email || ''} className="w-24 h-24" />
+                    <div className="absolute -bottom-2 -right-2">
+                      <Button
+                        size="sm"
+                        className="rounded-full bg-gradient-cosmic hover:scale-110 transition-all"
+                        onClick={() => document.getElementById('avatar-upload')?.click()}
+                      >
+                        <Camera className="w-4 h-4" />
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="destructive"
+                        className="rounded-full hover:scale-110 transition-all"
+                        onClick={deleteAvatar}
+                        disabled={loading}
+                        title="Supprimer l'avatar"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </div>
                     <input
                       id="avatar-upload"
                       type="file"

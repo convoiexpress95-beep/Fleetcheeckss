@@ -34,7 +34,7 @@ export const NativeMissionTracking = ({ missionId, isActive = false }: NativeMis
   });
   
   const [batteryLevel, setBatteryLevel] = useState<number | null>(null);
-  const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  const intervalRef = useRef<number | null>(null);
   const lastPositionRef = useRef<{ lat: number; lng: number } | null>(null);
 
   // Calculer la distance entre deux points
@@ -114,12 +114,12 @@ export const NativeMissionTracking = ({ missionId, isActive = false }: NativeMis
 
     // Démarrer le compteur de durée
     const startTime = Date.now();
-    intervalRef.current = setInterval(() => {
+    intervalRef.current = window.setInterval(() => {
       setTrackingStats(prev => ({
         ...prev,
         duration: Math.floor((Date.now() - startTime) / 1000),
       }));
-    }, 1000);
+    }, 1000) as number;
 
     toast({
       title: 'Suivi démarré',
@@ -132,7 +132,7 @@ export const NativeMissionTracking = ({ missionId, isActive = false }: NativeMis
     await stopTracking();
     
     if (intervalRef.current) {
-      clearInterval(intervalRef.current);
+      window.clearInterval(intervalRef.current);
       intervalRef.current = null;
     }
 
@@ -146,7 +146,7 @@ export const NativeMissionTracking = ({ missionId, isActive = false }: NativeMis
   useEffect(() => {
     return () => {
       if (intervalRef.current) {
-        clearInterval(intervalRef.current);
+        window.clearInterval(intervalRef.current);
       }
     };
   }, []);

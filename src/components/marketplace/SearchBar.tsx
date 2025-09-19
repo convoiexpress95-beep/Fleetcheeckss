@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { MapPin, ArrowLeftRight, Calendar, Search, Zap, Target } from "lucide-react";
+import { BRAND_NAME } from "@/lib/branding";
 
 const SearchBar = () => {
   const [departure, setDeparture] = useState("");
@@ -30,7 +31,7 @@ const SearchBar = () => {
           {/* Topbar colorée avec le thème sombre */}
           <div className="inline-flex items-center gap-2 bg-gradient-to-r from-cyan-600/90 to-teal-600/90 backdrop-blur-md rounded-full px-8 py-3 mb-6 border border-cyan-400/30 shadow-lg">
             <Zap className="w-5 h-5 text-white" />
-            <span className="text-sm font-bold text-white tracking-wide">FleetCheecks Marketplace</span>
+            <span className="text-sm font-bold text-white tracking-wide">{BRAND_NAME} Marketplace</span>
           </div>
           
           <h2 className="text-4xl md:text-5xl font-bold mb-6 bg-gradient-to-r from-white via-cyan-200 to-teal-200 bg-clip-text text-transparent">

@@ -4,6 +4,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks';
+import { ProfileService } from '@/services/profileService';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -50,7 +51,6 @@ export default function Onboarding() {
 
       const patch: any = {
         full_name: fullName || displayName,
-        updated_at: new Date().toISOString(),
         phone,
         // colonnes cross-app
         display_name: displayName || fullName,
@@ -59,9 +59,21 @@ export default function Onboarding() {
       };
       if (avatar_url) patch.avatar_url = avatar_url;
 
-      // upsert sur profils de l'utilisateur
-      const { error } = await supabase.from('profiles').upsert({ user_id: user.id, email: user.email || '', ...patch }).eq('user_id', user.id);
-      if (error) throw error;
+      // Utiliser le ProfileService pour une gestion sécurisée
+      const success = await ProfileService.safeUpsertProfile({
+        user_id: user.id,
+        email: user.email || '',
+        full_name: fullName || displayName || user.email?.split('@')[0] || '',
+        phone,
+        avatar_url,
+        display_name: displayName || fullName,
+        bio,
+        location
+      });
+
+      if (!success) {
+        throw new Error('Impossible de sauvegarder le profil. Veuillez réessayer.');
+      }
 
       toast({ title: 'Profil enregistré', description: 'Votre compte est prêt sur toutes les plateformes.' });
     } catch (e: any) {

@@ -2,6 +2,7 @@ import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
 import { CreditsDisplay } from "@/components/CreditsDisplay";
 import { NotificationBell } from "@/components/NotificationBell";
+import { RealtimeStatus } from "@/components/RealtimeStatus";
 import { useLocation, Link } from "react-router-dom";
 import { useEffect, useRef, useState } from "react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -110,6 +111,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
               </div>
             </div>
             <div className="ml-auto flex items-center gap-3">
+              <RealtimeStatus />
               <NotificationBell />
               <CreditsDisplay />
             </div>

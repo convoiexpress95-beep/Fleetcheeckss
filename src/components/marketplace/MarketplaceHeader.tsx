@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { User, Bell, MessageCircle, Plus, Search, Briefcase, UserCheck, History, Activity, ChevronDown } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import { BRAND_NAME } from "@/lib/branding";
 import { useNavigate, useLocation } from "react-router-dom";
 import {
   DropdownMenu,
@@ -42,7 +43,7 @@ const MarketplaceHeader = () => {
               <span className="text-white font-bold text-lg">F</span>
             </div>
             <div>
-              <h1 className="font-bold text-xl text-white">FleetCheecks</h1>
+              <h1 className="font-bold text-xl text-white">{BRAND_NAME}</h1>
               <p className="text-xs text-gray-300">Marketplace</p>
             </div>
           </div>

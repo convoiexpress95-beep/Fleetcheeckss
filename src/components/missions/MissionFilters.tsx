@@ -1,9 +1,8 @@
 import { Button } from '@/components/ui/button';
-import { MissionStatus } from '@/lib/mission-types';
-import { MissionFiltersState } from '@/hooks/useMissionStore';
+import type { MissionFiltersState } from '@/hooks/useMissionSupabase';
 import { useState, useEffect } from 'react';
 
-const ALL_STATUSES: MissionStatus[] = ['En attente','En cours','Livrée','Annulée','En retard']; // conservé mais non affiché
+// Statuts UI non affichés ici (quick filters via KPIs)
 
 interface Props {
   filters: MissionFiltersState;
@@ -11,7 +10,7 @@ interface Props {
 }
 export const MissionFilters: React.FC<Props> = ({ filters, onChange }) => {
   // Barre recherche & badges retirés (doublon avec nouveaux quick filters)
-  const reset = () => onChange({ ...filters, search:'', status:[], client:[], convoyeur:[], dateFrom:undefined, dateTo:undefined });
+  const reset = () => onChange({ ...filters, search:'', status:[], client:[], dateFrom:undefined, dateTo:undefined });
   return (
     <div className="flex justify-end mb-4">
       <div className="flex gap-2">

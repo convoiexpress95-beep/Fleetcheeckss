@@ -84,8 +84,9 @@ const Dashboard = () => {
       stats: { active: stats.marketplaceOffers, total: 127 },
       actions: [
         { label: 'Voir les missions', url: '/marketplace' },
-        { label: 'Mes offres', url: '/my-offers' },
-        { label: 'Historique', url: '/mission-history' }
+        // Correction des chemins pour correspondre aux routes définies dans App.tsx
+        { label: 'Mes offres', url: '/marketplace/my-offers' },
+        { label: 'Historique', url: '/marketplace/history' }
       ]
     },
     {

@@ -1,5 +1,8 @@
 # Welcome to your Lovable project
 
+<!-- Ajout instrumentation DB -->
+> Debug DB: définir `VITE_DEBUG_DB=1` pour activer les logs d'instrumentation générique (voir `src/lib/dbTracer.ts`).
+
 ## Project info
 
 **URL**: https://lovable.dev/projects/2ef1e4e8-1315-408a-bdf7-f0957274267f

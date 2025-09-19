@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FleetCheck Mobile - Démo Interactive</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background-color: #f5f5f5;
+            color: #333;
+            line-height: 1.6;
+        }
+
+        .phone-container {
+            max-width: 375px;
+            margin: 20px auto;
+            background: #000;
+            border-radius: 25px;
+            padding: 8px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+        }
+
+        .screen {
+            background: white;
+            border-radius: 20px;
+            height: 667px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .status-bar {
+            height: 44px;
+            background: #fff;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 20px;
+            font-size: 14px;
+            font-weight: 600;
+            border-bottom: 1px solid #e1e1e1;
+        }
+
+        .header {
+            background: #007AFF;
+            color: white;
+            padding: 15px 20px;
+            font-size: 18px;
+            font-weight: bold;
+            text-align: center;
+        }
+
+        .tab-bar {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 83px;
+            background: white;
+            border-top: 1px solid #e1e1e1;
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            padding-bottom: 20px;
+        }
+
+        .tab {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            cursor: pointer;
+            padding: 5px;
+            transition: color 0.2s;
+        }
+
+        .tab.active {
+            color: #007AFF;
+        }
+
+        .tab.inactive {
+            color: #8E8E93;
+        }
+
+        .tab-icon {
+            font-size: 24px;
+            margin-bottom: 4px;
+        }
+
+        .tab-label {
+            font-size: 10px;
+            font-weight: 500;
+        }
+
+        .content {
+            padding: 20px;
+            height: calc(100% - 44px - 60px - 83px);
+            overflow-y: auto;
+        }
+
+        .screen-title {
+            font-size: 24px;
+            font-weight: bold;
+            margin-bottom: 20px;
+            color: #1f2937;
+        }
+
+        .feature-card {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 16px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+
+        .feature-title {
+            font-size: 18px;
+            font-weight: bold;
+            margin-bottom: 12px;
+            color: #333;
+        }
+
+        .feature-description {
+            color: #666;
+            margin-bottom: 12px;
+        }
+
+        .feature-stats {
+            display: flex;
+            justify-content: space-between;
+            font-size: 14px;
+        }
+
+        .stat {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .stat-value {
+            font-weight: bold;
+            color: #007AFF;
+            font-size: 16px;
+        }
+
+        .stat-label {
+            color: #666;
+            font-size: 12px;
+        }
+
+        .btn {
+            background: #007AFF;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            padding: 12px 20px;
+            font-weight: 600;
+            cursor: pointer;
+            width: 100%;
+            margin-top: 12px;
+        }
+
+        .btn:hover {
+            background: #0056CC;
+        }
+
+        .demo-info {
+            max-width: 800px;
+            margin: 20px auto;
+            padding: 20px;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+
+        .tech-stack {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
+            margin-top: 20px;
+        }
+
+        .tech-item {
+            background: #f8f9fa;
+            padding: 16px;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .hidden {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="demo-info">
+        <h1>📱 FleetCheck Mobile - Application de Gestion de Transport</h1>
+        <p><strong>Version optimisée Android avec SafeAreaView</strong></p>
+        
+        <div class="tech-stack">
+            <div class="tech-item">
+                <h3>🚗 Covoiturage</h3>
+                <p>Recherche et publication de trajets avec système de réservation</p>
+            </div>
+            <div class="tech-item">
+                <h3>📦 Marketplace</h3>
+                <p>Gestion des missions de transport et système d'enchères</p>
+            </div>
+            <div class="tech-item">
+                <h3>💰 Facturation</h3>
+                <p>Création et suivi des factures avec tableau de bord financier</p>
+            </div>
+            <div class="tech-item">
+                <h3>🛠️ Tech Stack</h3>
+                <p>React Native + Expo SDK 53/54 + TypeScript + React Navigation</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="phone-container">
+        <div class="screen">
+            <div class="status-bar">
+                <span>9:41</span>
+                <span>📶 📶 📶 🔋100%</span>
+            </div>
+            
+            <div class="header" id="screen-header">
+                Covoiturage
+            </div>
+
+            <div class="content" id="screen-content">
+                <!-- Covoiturage Screen -->
+                <div id="covoiturage-screen">
+                    <div class="feature-card">
+                        <div class="feature-title">🔍 Rechercher un trajet</div>
+                        <div class="feature-description">Paris → Lyon • 15 Jan 2025 • 14:30</div>
+                        <div class="feature-stats">
+                            <div class="stat">
+                                <div class="stat-value">45€</div>
+                                <div class="stat-label">Prix</div>
+                            </div>
+                            <div class="stat">
+                                <div class="stat-value">3</div>
+                                <div class="stat-label">Places</div>
+                            </div>
+                            <div class="stat">
+                                <div class="stat-value">4.8⭐</div>
+                                <div class="stat-label">Note</div>
+                            </div>
+                        </div>
+                        <button class="btn">Réserver ce trajet</button>
+                    </div>
+                    
+                    <div class="feature-card">
+                        <div class="feature-title">🚗 Proposer un trajet</div>
+                        <div class="feature-description">Créez votre propre trajet et gagnez de l'argent</div>
+                        <button class="btn">Publier un trajet</button>
+                    </div>
+                </div>
+
+                <!-- Marketplace Screen -->
+                <div id="marketplace-screen" class="hidden">
+                    <div class="feature-card">
+                        <div class="feature-title">📦 Transport marchandises fragiles</div>
+                        <div class="feature-description">Paris → Lyon • Livraison d'objets en verre</div>
+                        <div class="feature-stats">
+                            <div class="stat">
+                                <div class="stat-value">350€</div>
+                                <div class="stat-label">Budget</div>
+                            </div>
+                            <div class="stat">
+                                <div class="stat-value">🔴</div>
+                                <div class="stat-label">Urgent</div>
+                            </div>
+                            <div class="stat">
+                                <div class="stat-value">4.7⭐</div>
+                                <div class="stat-label">Client</div>
+                            </div>
+                        </div>
+                        <button class="btn">Faire une offre</button>
+                    </div>
+                    
+                    <div class="feature-card">
+                        <div class="feature-title">🏢 Déménagement petit appartement</div>
+                        <div class="feature-description">Marseille → Nice • Transport meubles 20m²</div>
+                        <div class="feature-stats">
+                            <div class="stat">
+                                <div class="stat-value">200€</div>
+                                <div class="stat-label">Budget</div>
+                            </div>
+                            <div class="stat">
+                                <div class="stat-value">🟡</div>
+                                <div class="stat-label">Modéré</div>
+                            </div>
+                            <div class="stat">
+                                <div class="stat-value">4.5⭐</div>
+                                <div class="stat-label">Client</div>
+                            </div>
+                        </div>
+                        <button class="btn">Faire une offre</button>
+                    </div>
+                </div>
+
+                <!-- Facturation Screen -->
+                <div id="facturation-screen" class="hidden">
+                    <div class="feature-card">
+                        <div class="feature-title">📊 Tableau de bord</div>
+                        <div class="feature-stats">
+                            <div class="stat">
+                                <div class="stat-value">1825€</div>
+                                <div class="stat-label">Revenus totaux</div>
+                            </div>
+                            <div class="stat">
+                                <div class="stat-value">770€</div>
+                                <div class="stat-label">En attente</div>
+                            </div>
+                            <div class="stat">
+                                <div class="stat-value">5</div>
+                                <div class="stat-label">Factures</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="feature-card">
+                        <div class="feature-title">📄 Facture INV-2025-003</div>
+                        <div class="feature-description">Entreprise Dupont • Déménagement bureaux</div>
+                        <div class="feature-stats">
+                            <div class="stat">
+                                <div class="stat-value">650€</div>
+                                <div class="stat-label">Montant</div>
+                            </div>
+                            <div class="stat">
+                                <div class="stat-value">⚠️</div>
+                                <div class="stat-label">En retard</div>
+                            </div>
+                        </div>
+                        <button class="btn">Relancer le client</button>
+                    </div>
+                </div>
+
+                <!-- Fleet Screen -->
+                <div id="fleet-screen" class="hidden">
+                    <div class="feature-card">
+                        <div class="feature-title">🚛 Gestion de flotte</div>
+                        <div class="feature-description">Tableau de bord des véhicules et conducteurs</div>
+                        <div style="text-align: center; color: #f59e0b; font-weight: 500; margin-top: 20px;">
+                            🚧 Fonctionnalité en développement
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Profile Screen -->
+                <div id="profile-screen" class="hidden">
+                    <div class="feature-card">
+                        <div class="feature-title">👤 Profil utilisateur</div>
+                        <div class="feature-description">Paramètres et informations du compte</div>
+                        <div style="text-align: center; color: #f59e0b; font-weight: 500; margin-top: 20px;">
+                            🚧 Fonctionnalité en développement
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="tab-bar">
+                <div class="tab active" onclick="showScreen('covoiturage', this)">
+                    <div class="tab-icon">🚗</div>
+                    <div class="tab-label">Trajets</div>
+                </div>
+                <div class="tab inactive" onclick="showScreen('marketplace', this)">
+                    <div class="tab-icon">📦</div>
+                    <div class="tab-label">Missions</div>
+                </div>
+                <div class="tab inactive" onclick="showScreen('facturation', this)">
+                    <div class="tab-icon">💰</div>
+                    <div class="tab-label">Factures</div>
+                </div>
+                <div class="tab inactive" onclick="showScreen('fleet', this)">
+                    <div class="tab-icon">🚛</div>
+                    <div class="tab-label">Flotte</div>
+                </div>
+                <div class="tab inactive" onclick="showScreen('profile', this)">
+                    <div class="tab-icon">👤</div>
+                    <div class="tab-label">Profil</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="demo-info">
+        <h2>🎯 Fonctionnalités Implémentées</h2>
+        <ul>
+            <li>✅ <strong>Covoiturage :</strong> Recherche de trajets, données d'exemple enrichies, SafeAreaView Android</li>
+            <li>✅ <strong>Marketplace :</strong> 5 missions d'exemple, système d'enchères, interface optimisée</li>
+            <li>✅ <strong>Facturation :</strong> 5 factures d'exemple, tableau de bord, statistiques financières</li>
+            <li>✅ <strong>Navigation :</strong> Bottom Tab Navigator avec 5 écrans fonctionnels</li>
+            <li>✅ <strong>Compatibilité Android :</strong> SafeAreaView, StatusBar, Platform-specific styling</li>
+            <li>✅ <strong>Architecture :</strong> TypeScript, React Native 0.74.5, Expo SDK 53/54</li>
+        </ul>
+        
+        <h3>🚧 En Développement</h3>
+        <ul>
+            <li>🔄 Gestion de flotte (écran placeholder)</li>
+            <li>🔄 Profil utilisateur (écran placeholder)</li>
+        </ul>
+    </div>
+
+    <script>
+        function showScreen(screenName, tabElement) {
+            // Hide all screens
+            const screens = ['covoiturage', 'marketplace', 'facturation', 'fleet', 'profile'];
+            screens.forEach(screen => {
+                document.getElementById(screen + '-screen').classList.add('hidden');
+            });
+            
+            // Show selected screen
+            document.getElementById(screenName + '-screen').classList.remove('hidden');
+            
+            // Update header
+            const headers = {
+                'covoiturage': 'Covoiturage',
+                'marketplace': 'Marketplace des missions',
+                'facturation': 'Gestion de facturation',
+                'fleet': 'Gestion de flotte',
+                'profile': 'Mon profil'
+            };
+            document.getElementById('screen-header').textContent = headers[screenName];
+            
+            // Update tab states
+            document.querySelectorAll('.tab').forEach(tab => {
+                tab.classList.remove('active');
+                tab.classList.add('inactive');
+            });
+            tabElement.classList.remove('inactive');
+            tabElement.classList.add('active');
+        }
+    </script>
+</body>
+</html>

@@ -1,6 +1,7 @@
 import React, { useState, useCallback, useMemo, useRef } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Mission } from '@/lib/mission-types';
+// On n'utilise plus le type Mission complet pour la création: on émet un InsertSupabaseMission directement
+import type { InsertSupabaseMission } from '@/hooks/useMissionSupabase';
 import { NewMissionForm, NewMissionStepMeta, NewMissionFormValues } from './NewMissionForm';
 import { MissionPrintSummary } from './MissionPrintSummary';
 import { Button } from '@/components/ui/button';
@@ -31,7 +32,7 @@ import {
 interface Props { 
   open: boolean; 
   onClose: () => void; 
-  onCreate: (m: Mission) => void; 
+  onCreate: (m: InsertSupabaseMission) => void; 
   preAssignedContact?: {
     id: string;
     name: string;
@@ -85,8 +86,19 @@ export const MissionCreateDrawer: React.FC<Props> = ({ open, onClose, onCreate, 
     if (onCloseRef.current) onCloseRef.current(); 
   }, []);
   
-  const onSubmitMission = useCallback((m: Mission) => { 
-    if (onCreateRef.current) onCreateRef.current(m); 
+  const onSubmitMission = useCallback((m: any) => { 
+    // Conversion formulaire -> InsertSupabaseMission minimal
+    const payload: InsertSupabaseMission = {
+      titre: m?.clientName || m?.client?.name || 'Mission sans titre',
+      ville_depart: m?.departureCity || m?.departure?.address?.city || '',
+      ville_arrivee: m?.arrivalCity || m?.arrival?.address?.city || '',
+      date_depart: m?.departureDate || m?.departure?.date || new Date().toISOString(),
+      description: m?.notes || m?.description || undefined,
+      prix_propose: m?.price ? Number(m.price) : undefined,
+      vehicule_requis: [m?.vehicle?.brand, m?.vehicle?.model].filter(Boolean).join(' ').trim() || undefined,
+      statut: 'ouverte'
+    };
+    if (onCreateRef.current) onCreateRef.current(payload); 
     close(); 
   }, [close]);
   

@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar"; // Avatar conservé pour style
+import UserAvatar from '@/components/UserAvatar';
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { MapPin, Calendar, Clock, Users, Euro, Star, Phone, MessageCircle, Car, Shield, Snowflake, Music, CigaretteOff, Heart, Share2 } from "lucide-react";
@@ -198,15 +199,7 @@ const TripDetails = () => {
                 <h3 className="text-lg font-semibold mb-4">Conducteur</h3>
 
                 <div className="flex items-center gap-4 mb-6">
-                  <Avatar className="w-16 h-16 ring-2 ring-primary/20">
-                    <AvatarImage src={trip.driver.avatar} />
-                    <AvatarFallback className="bg-primary/10 text-primary">
-                      {trip.driver.name
-                        .split(" ")
-                        .map((n) => n[0])
-                        .join("")}
-                    </AvatarFallback>
-                  </Avatar>
+                  <UserAvatar src={trip.driver.avatar} name={trip.driver.name} className="w-16 h-16 ring-2 ring-primary/20" />
                   <div className="flex-1">
                     <div className="font-semibold">{trip.driver.name}</div>
                     <div className="flex items-center gap-1 text-sm">

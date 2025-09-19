@@ -18,14 +18,105 @@ export interface Mission {
   vehicle_brand?: string;
   vehicle_model?: string;
   vehicle_year?: number;
-  license_plate?: string;
-  driver_earning?: number;
-  donor_earning?: number;
-  created_by: string;
-  driver_id?: string;
-  donor_id?: string;
+}
+
+// Nouveaux types pour les fonctionnalités ajoutées
+
+// Types Covoiturage
+export interface CovoiturageTrip {
+  id: string;
+  departure: string;
+  destination: string;
+  departure_time: string;
+  available_seats: number;
+  price_per_seat: number;
+  driver_name: string;
+  driver_rating: number;
+  vehicle_info: string;
+  status: 'available' | 'booked' | 'completed';
   created_at: string;
   updated_at: string;
+}
+
+export interface CovoiturageBooking {
+  id: string;
+  trip_id: string;
+  passenger_id: string;
+  passenger_name: string;
+  seats_booked: number;
+  total_amount: number;
+  status: 'pending' | 'confirmed' | 'cancelled';
+  created_at: string;
+}
+
+// Types Marketplace
+export interface MarketplaceMission {
+  id: string;
+  title: string;
+  description: string;
+  pickup_location: string;
+  delivery_location: string;
+  vehicle_type: string;
+  urgency: 'low' | 'medium' | 'high';
+  budget_min: number;
+  budget_max: number;
+  deadline: string;
+  company_name: string;
+  company_rating: number;
+  proposals_count: number;
+  status: 'open' | 'in_progress' | 'closed';
+  created_at: string;
+  updated_at: string;
+}
+
+export interface MarketplaceProposal {
+  id: string;
+  mission_id: string;
+  contractor_id: string;
+  contractor_name: string;
+  contractor_rating: number;
+  proposed_price: number;
+  estimated_duration: string;
+  message: string;
+  status: 'pending' | 'accepted' | 'rejected';
+  created_at: string;
+}
+
+// Types Facturation
+export interface Invoice {
+  id: string;
+  invoice_number: string;
+  client_name: string;
+  client_email: string;
+  mission_title: string;
+  amount: number;
+  tax_amount: number;
+  total_amount: number;
+  status: 'draft' | 'sent' | 'paid' | 'overdue';
+  created_at: string;
+  due_date: string;
+  paid_at?: string;
+}
+
+export interface Quote {
+  id: string;
+  quote_number: string;
+  client_name: string;
+  client_email: string;
+  description: string;
+  amount: number;
+  tax_amount: number;
+  total_amount: number;
+  status: 'pending' | 'accepted' | 'rejected' | 'expired';
+  created_at: string;
+  valid_until: string;
+}
+
+export interface PaymentStats {
+  total_revenue: number;
+  pending_amount: number;
+  overdue_amount: number;
+  this_month_revenue: number;
 }
 
 export interface InspectionDeparture {

@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useRef, useState } from 'react';
 import type { User, Session } from '@supabase/supabase-js';
+import { ProfileService } from '@/services/profileService';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks';
 
@@ -33,31 +34,46 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
   const ensuringProfileRef = useRef(false);
+  const profileEnsuredCache = useRef(new Set<string>()); // Cache des user_id pour lesquels le profil a été assuré
 
-  // Crée le profil si manquant pour éviter les 406 sur .single()
+  // Assure la présence du profil (upsert idempotent pour éviter les 409)
   const ensureProfile = async (u: User | null | undefined) => {
-    if (!u || ensuringProfileRef.current) return;
+    if (!u || ensuringProfileRef.current || profileEnsuredCache.current.has(u.id)) return;
     ensuringProfileRef.current = true;
     try {
-      const { data: existing, error: selErr } = await supabase
-        .from('profiles')
-        .select('user_id')
-        .eq('user_id', u.id)
-        .maybeSingle();
+      const full_name = (u.user_metadata?.full_name as string) || (u.email?.split('@')[0] ?? '');
+      const email = u.email ?? '';
+      
+      // Utilisation du service ProfileService pour éviter les conflits
+      const success = await ProfileService.safeUpsertProfile({
+        user_id: u.id,
+        email,
+        full_name
+      });
 
-      if (selErr) {
-        console.warn('ensureProfile select warning:', selErr.message);
-      }
-
-      if (!existing) {
-        const full_name = (u.user_metadata?.full_name as string) || (u.email?.split('@')[0] ?? '');
-        const email = u.email ?? '';
-        const { error: insErr } = await supabase
-          .from('profiles')
-          .insert({ user_id: u.id, full_name, email });
-        if (insErr) {
-          console.warn('ensureProfile insert warning:', insErr.message);
-        }
+      if (success) {
+        profileEnsuredCache.current.add(u.id);
+        
+        // Vérification différée pour s'assurer que le profil est bien visible
+        setTimeout(async () => {
+          try {
+            const { data: profile } = await supabase
+              .from('profiles')
+              .select('user_id')
+              .eq('user_id', u.id)
+              .single();
+            
+            if (!profile) {
+              console.warn('Profile created but not immediately visible for user:', u.id);
+              // Relancer la création si nécessaire
+              profileEnsuredCache.current.delete(u.id);
+            }
+          } catch (error) {
+            console.warn('Profile verification error:', error);
+          }
+        }, 500); // Délai de 500ms pour permettre la propagation
+      } else {
+        console.warn('ProfileService.safeUpsertProfile failed for user:', u.id);
       }
     } catch (e: any) {
       console.warn('ensureProfile error:', e?.message || e);
@@ -71,6 +87,12 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
         console.log('Auth state changed:', event, session?.user?.id);
+        
+        // Nettoyer le cache si l'utilisateur change ou se déconnecte
+        if (event === 'SIGNED_OUT' || (session?.user?.id && session.user.id !== user?.id)) {
+          profileEnsuredCache.current.clear();
+        }
+        
         setSession(session);
         setUser(session?.user ?? null);
         setLoading(false);
@@ -165,6 +187,9 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   const signOut = async () => {
     try {
       await supabase.auth.signOut();
+      // Nettoyer le cache des profils lors de la déconnexion
+      profileEnsuredCache.current.clear();
+      ProfileService.clearCache(); // Nettoyer aussi le cache du service
       toast({
         title: "Déconnexion réussie",
         description: "À bientôt !",

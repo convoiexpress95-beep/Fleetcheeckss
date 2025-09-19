@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { BRAND_NAME } from '@/lib/branding';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -89,11 +90,11 @@ const Login = () => {
         <div className="text-center mb-8">
           <div className="mb-6">
             <h1 className="text-3xl font-bold text-white tracking-tight">
-              FleetCheecks
+              {BRAND_NAME}
             </h1>
           </div>
           <p className="text-foreground/80 text-lg">
-            Connectez-vous à FleetCheecks pour gérer vos inspections véhicules
+            Connectez-vous à {BRAND_NAME} pour gérer vos inspections véhicules
           </p>
         </div>
 
@@ -103,7 +104,7 @@ const Login = () => {
               Bienvenue
             </CardTitle>
             <CardDescription className="text-muted-foreground">
-              Connectez-vous ou créez un compte pour accéder à FleetCheecks
+              Connectez-vous ou créez un compte pour accéder à {BRAND_NAME}
             </CardDescription>
             {personaBanner}
           </CardHeader>
@@ -241,7 +242,7 @@ const Login = () => {
                     ) : (
                       <>
                         <Sparkles className="w-5 h-5 mr-2" />
-                        Créer mon compte FleetCheecks
+                        Créer mon compte {BRAND_NAME}
                       </>
                     )}
                   </Button>

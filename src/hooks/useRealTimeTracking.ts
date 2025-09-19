@@ -44,35 +44,88 @@ export const useRealTimeTracking = () => {
 
     try {
       setLoading(true);
-      const { data, error } = await supabase
-        .from('missions')
+      // Vue SQL "missions_simplified" non déclarée dans les types générés => cast any
+      // Tentative via la vue simplifiée
+      const { data, error } = await (supabase as any)
+        .from('missions_simplified')
         .select(`
-          id,
-          reference,
-          title,
-          description,
-          pickup_address,
-          delivery_address,
-          pickup_date,
-          delivery_date,
-          status,
-          driver_id,
-          created_by
+          id,reference,title,description,pickup_address,delivery_address,pickup_date,delivery_date,raw_status,ui_status,driver_id,created_by,donor_id,created_at
         `)
         .or(`created_by.eq.${user.id},donor_id.eq.${user.id},driver_id.eq.${user.id}`)
-        .in('status', ['pending', 'in_progress'])
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
+      let missionsWithTracking: MissionWithTracking[] = [];
 
-      const missionsWithTracking: MissionWithTracking[] = (data || []).map(mission => ({
-        ...mission,
-        status: mission.status as 'pending' | 'in_progress' | 'completed' | 'cancelled',
-        driver_profile: null, // Will be loaded separately if needed
-        tracking: null // sera mis à jour par le chargement initial + abonnement temps réel
-      }));
+      if (error) {
+        // Si la vue n'existe pas encore (migrations non appliquées en local) => fallback table missions
+        // Code PostgREST: PGRST205 table not found (schema cache)
+        if ((error as any).code === 'PGRST205') {
+          console.warn('[missions_simplified] Vue absente - fallback sur table missions');
+          const { data: baseData, error: baseErr } = await supabase
+            .from('missions')
+            .select(`
+              id,reference,title,description,pickup_address,delivery_address,pickup_date,delivery_date,status,driver_id,created_by,donor_id,created_at
+            `)
+            .or(`created_by.eq.${user.id},donor_id.eq.${user.id},driver_id.eq.${user.id}`)
+            .order('created_at', { ascending: false });
+          if (baseErr) throw baseErr;
+          const mapRawToUi = (s: string | null | undefined): MissionWithTracking['status'] => {
+            switch (s) {
+              case 'draft':
+              case 'published':
+              case 'assigned':
+                return 'pending';
+              case 'picked_up':
+              case 'in_transit':
+              case 'delivered':
+                return 'in_progress';
+              case 'completed':
+                return 'completed';
+              case 'cancelled':
+                return 'cancelled';
+              default:
+                return 'pending';
+            }
+          };
+          missionsWithTracking = (baseData || []).map((m: any) => ({
+            id: m.id,
+            reference: m.reference,
+            title: m.title,
+            description: m.description,
+            pickup_address: m.pickup_address,
+            delivery_address: m.delivery_address,
+            pickup_date: m.pickup_date,
+            delivery_date: m.delivery_date,
+            status: mapRawToUi(m.status),
+            driver_id: m.driver_id,
+            created_by: m.created_by,
+            tracking: null,
+            driver_profile: null,
+          }));
+        } else {
+          throw error;
+        }
+      } else {
+        missionsWithTracking = (data || []).map((mission: any) => ({
+          id: mission.id,
+          reference: mission.reference,
+          title: mission.title,
+          description: mission.description,
+          pickup_address: mission.pickup_address,
+          delivery_address: mission.delivery_address,
+          pickup_date: mission.pickup_date,
+          delivery_date: mission.delivery_date,
+          status: (mission.ui_status || 'pending') as MissionWithTracking['status'],
+          driver_id: mission.driver_id,
+          created_by: mission.created_by,
+          tracking: null,
+          driver_profile: null,
+        }));
+      }
 
-      setMissions(missionsWithTracking);
+  // Ne garder que les missions "en cours" (ui_status = in_progress)
+  const inProgress = missionsWithTracking.filter(m => m.status === 'in_progress');
+  setMissions(inProgress);
       // Charger les derniers points de tracking pour ces missions (initial state)
       const missionIds = missionsWithTracking.map(m => m.id);
       if (missionIds.length) {
@@ -157,29 +210,18 @@ export const useRealTimeTracking = () => {
   }, [user]);
 
   // Mettre à jour le statut d'une mission
-  const updateMissionStatus = async (missionId: string, status: 'pending' | 'in_progress' | 'completed' | 'cancelled') => {
+  const updateMissionStatus = async (missionId: string, status: MissionWithTracking['status']) => {
     if (!user) return false;
 
+    // Dans le modèle "statut virtuel" (pas de colonne status physique),
+    // on ne persiste pas ce changement côté DB car la vue le dérive d'autres événements.
+    // On applique donc seulement une MAJ optimiste locale.
     try {
-      const { error } = await supabase
-        .from('missions')
-        .update({ 
-          status,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', missionId);
-
-      if (error) throw error;
-
-      setMissions(prev => prev.map(m => 
-        m.id === missionId 
-          ? { ...m, status }
-          : m
-      ));
-
+      // TODO: si plus tard une colonne réelle est ajoutée, réintroduire le mapping UI->raw ici.
+      setMissions(prev => prev.map(m => m.id === missionId ? { ...m, status } : m));
       return true;
     } catch (err) {
-      console.error('Error updating mission status:', err);
+      console.error('Error updating mission status (virtual mode):', err);
       return false;
     }
   };

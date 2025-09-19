@@ -31,8 +31,6 @@
   ],
   "exclude": [
     "src/components/fleetcheck/**",
-  "app-syncer/**",
-    "drive-connect-suite-main/**",
     "mobile-app/**",
     "dist/**",
     "**/archive/**"
