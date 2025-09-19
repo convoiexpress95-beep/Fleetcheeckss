@@ -22,6 +22,7 @@ import {
   TrendingUp
 } from "lucide-react";
 import { NavLink, useLocation } from "react-router-dom";
+import { BRAND_NAME } from "@/lib/branding";
 import { useCart } from '@/contexts/CartContext';
 import { useAuth } from "@/contexts/AuthContext";
 import { useAdmin } from "@/hooks/useAdmin";
@@ -114,7 +115,7 @@ export function AppSidebar() {
             {!state || state === 'expanded' ? (
               <div>
                 <h2 className="font-bold text-lg bg-gradient-to-r from-foreground to-foreground/80 bg-clip-text text-transparent">
-                  FleetChecks
+                  {BRAND_NAME}
                 </h2>
                 <p className="text-xs text-muted-foreground font-medium">
                   Fleet Management Suite

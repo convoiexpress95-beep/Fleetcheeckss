@@ -108,48 +108,30 @@ const MessagingInterface = ({ userId, userRole }: MessagingInterfaceProps) => {
 
   const fetchMessages = useCallback(async (conversationId: string) => {
     try {
-  const { data, error } = await (supabase as any)
+      const { data: msgs, error } = await (supabase as any)
         .from('messages')
-        .select(`
-          *,
-          profiles!sender_id (
-            full_name,
-            email
-          )
-        `)
+        .select(`*`)
         .eq('conversation_id', conversationId)
         .order('created_at', { ascending: true });
-
-  if (error) throw error;
-  interface RawMessage { id: string; content: string; sender_id: string; message_type: string; metadata?: unknown; created_at: string; read_at?: string | null; profiles?: unknown }
-  const isProfile = (val: unknown): val is { full_name?: string; email?: string } => {
-    return !!val && typeof val === 'object' && !('error' in (val as Record<string, unknown>));
-  };
-  const safeData: Message[] = (data || []).map(raw => {
-    const rm = raw as RawMessage;
-    const prof = isProfile(rm.profiles) ? {
-      full_name: rm.profiles.full_name || 'Utilisateur',
-      email: rm.profiles.email || ''
-    } : null;
-    return {
-      id: rm.id,
-      content: rm.content,
-      sender_id: rm.sender_id,
-      message_type: rm.message_type,
-      metadata: (rm.metadata && typeof rm.metadata === 'object') ? rm.metadata as BaseMessageMetadata : null,
-      created_at: rm.created_at,
-      read_at: rm.read_at,
-      profiles: prof
-    };
-  });
-  setMessages(safeData);
+      if (error) throw error;
+      const list = (msgs || []) as any[];
+      const ids = Array.from(new Set(list.map(m => m.sender_id))).filter(Boolean);
+      let map: Record<string, { full_name: string; email: string } | null> = {};
+      if (ids.length) {
+        const { data: profs, error: e2 } = await (supabase as any)
+          .from('profiles')
+          .select('user_id, full_name, email')
+          .in('user_id', ids);
+        if (e2) throw e2;
+        map = (profs || []).reduce((acc: any, p: any) => {
+          acc[p.user_id] = { full_name: p.full_name, email: p.email };
+          return acc;
+        }, {});
+      }
+      setMessages(list.map(m => ({ ...m, profiles: map[m.sender_id] || null })) as any);
     } catch (error) {
       console.error('Erreur lors du chargement des messages:', error);
-      toast({
-        title: "Erreur",
-        description: "Impossible de charger les messages",
-        variant: "destructive",
-      });
+      toast({ title: "Erreur", description: "Impossible de charger les messages", variant: "destructive" });
     }
   }, [toast]);
 

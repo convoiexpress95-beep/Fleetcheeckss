@@ -1,13 +1,4 @@
 {
-  "files": [],
-  "references": [
-    {
-      "path": "./tsconfig.app.json"
-    },
-    {
-      "path": "./tsconfig.node.json"
-    }
-  ],
   "compilerOptions": {
     "baseUrl": ".",
     "paths": {
@@ -16,7 +7,7 @@
       ]
     },
     "module": "es2020",
-    "moduleResolution": "node",
+    "moduleResolution": "bundler",
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
     "resolveJsonModule": true,
@@ -36,18 +27,16 @@
     "strict": false,
     "noEmit": true,
     "incremental": true,
-    "jsx": "preserve"
+    "jsx": "react-jsx",
+    "allowImportingTsExtensions": true,
+    "types": [
+      "vite/client"
+    ]
   },
   "exclude": [
     "supabase/functions/**",
-    "app-syncer/**",
-    "drive-connect-suite-main/**",
     "mobile-app/**",
-    "Market/**",
-    "Missions-dev/**",
-    "covoiturage-bleu-sorcier-main/**",
-    "clear-trip-main/**",
-    "open-lovable/**",
+    "market-app/**",
     "dist/**",
     "**/archive/**"
   ],
@@ -55,5 +44,6 @@
     "next-env.d.ts",
     "**/*.ts",
     "**/*.tsx"
-  ]
+  ],
+  "extends": "expo/tsconfig.base"
 }

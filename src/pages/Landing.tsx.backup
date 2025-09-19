@@ -1,0 +1,735 @@
+import { Button } from "@/components/ui/button";
+import { BRAND_NAME } from "@/lib/branding";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Link, useLocation } from "react-router-dom";
+import { useEffect, useMemo, useState } from "react";
+import {
+  CheckCircle,
+  Truck,
+  FileText,
+  MapPin,
+  Users,
+  CreditCard,
+  Star,
+  Search,
+  Shield,
+  Clock,
+  ArrowRight,
+  Smartphone,
+  Monitor,
+  Zap,
+  Gauge,
+  Route,
+  Camera,
+  DollarSign,
+  BarChart3,
+  Sparkles,
+  Layers,
+  Globe,
+  ChevronRight,
+  Phone,
+  Mail,
+  Award,
+  Target,
+  Rocket,
+  Play,
+  Menu,
+  X,
+  Briefcase,
+  UserCheck,
+  Calculator,
+  Download,
+  Archive
+} from "lucide-react";
+import mobileAppMockup from "@/assets/mobile-app-mockup.jpg";
+import webAppMockup from "@/assets/web-app-mockup.jpg";
+import "../styles/landing-premium.css";
+
+const features = [
+  {
+    icon: Search,
+    title: "Inspection véhicules",
+    description: "Contrôlez l'état de vos véhicules avant et après convoyage"
+  },
+  {
+    icon: Truck,
+    title: "Gestion missions",
+    description: "Créez et suivez toutes vos missions de convoyage"
+  },
+  {
+    icon: MapPin,
+    title: "Suivi GPS",
+    description: "Localisez vos véhicules en temps réel"
+  },
+  {
+    icon: FileText,
+    title: "Facturation",
+    description: "Générez vos factures automatiquement"
+  },
+  {
+    icon: Users,
+    title: "Équipe",
+    description: "Gérez vos convoyeurs et donneurs d'ordre"
+  },
+  {
+    icon: Shield,
+    title: "Sécurisé",
+    description: "Vos données sont protégées et sauvegardées"
+  }
+];
+
+const plans = [
+  {
+    name: "Découverte",
+    price: "Gratuit",
+    credits: 5,
+  description: "Parfait pour tester FleetCheecks",
+    features: [
+      "5 crédits offerts",
+      "Toutes les fonctionnalités",
+      "Support par email"
+    ],
+    popular: false
+  },
+  {
+    name: "Pack Débutant",
+    price: "9,99€",
+    credits: 10,
+    description: "Idéal pour débuter",
+    features: [
+      "10 crédits",
+      "Valable 30 jours",
+      "Utilisation immédiate",
+      "Support par email"
+    ],
+    popular: false
+  },
+  {
+    name: "Pack Pro",
+    price: "19,99€",
+    credits: 25,
+    description: "Le plus populaire",
+    features: [
+      "25 crédits",
+      "Valable 30 jours",
+      "Support prioritaire",
+      "Rapports détaillés"
+    ],
+    popular: true
+  },
+  {
+    name: "Pack Expert",
+    price: "39,99€",
+    credits: 100,
+    description: "Pour les professionnels",
+    features: [
+      "100 crédits",
+      "Valable 30 jours",
+      "Support téléphonique",
+      "Formation incluse"
+    ],
+    popular: false
+  },
+  {
+    name: "Pack Entreprise",
+    price: "79,99€",
+    credits: 650,
+    description: "Pour les grandes entreprises",
+    features: [
+      "650 crédits",
+      "Valable 30 jours",
+      "Manager dédié",
+      "Support personnalisé"
+    ],
+    popular: false
+  }
+];
+
+// Nouvelles données modernes
+const mainFeatures = [
+  {
+    icon: Camera,
+    title: "Création de missions & inspections",
+    description: "Photos GPS, signatures numériques et rapports PDF légaux générés en 3 étapes.",
+    gradient: "from-blue-500 to-cyan-600",
+    benefits: ["Photos géolocalisées", "Signatures légales", "PDF automatisés"]
+  },
+  {
+    icon: Users,
+    title: "Gestion d'équipe & facturation", 
+    description: "Suivi des convoyeurs, génération de devis et facturation automatisée en temps réel.",
+    gradient: "from-purple-500 to-pink-600",
+    benefits: ["Suivi convoyeurs", "Devis instantanés", "Facturation auto"]
+  },
+  {
+    icon: Globe,
+    title: "Marketplace de missions",
+    description: "Publiez vos besoins, comparez les devis et choisissez le meilleur partenaire.",
+    gradient: "from-orange-500 to-red-600", 
+    benefits: ["Publication facile", "Comparaison devis", "Réseau partenaires"]
+  }
+];
+
+const stats = [
+  { value: "10K+", label: "Missions Traitées", icon: Target },
+  { value: "500+", label: "Professionnels", icon: Users },
+  { value: "99.9%", label: "Disponibilité", icon: Gauge },
+  { value: "4.9★", label: "Satisfaction", icon: Star }
+];
+
+const testimonials = [
+  {
+    name: "Marie Dubois",
+    role: "Directrice Transport, AutoLogistics",
+    content: "Depuis FleetChecks, nos missions sont suivies à 99.5%. Fini les appels constants aux convoyeurs !",
+    rating: 5,
+    avatar: "MD"
+  },
+  {
+    name: "Pierre Martin", 
+    role: "Convoyeur indépendant",
+    content: "L'app mobile est géniale. Je fais mes rapports en 2 minutes et mes clients adorent la transparence.",
+    rating: 5,
+    avatar: "PM"
+  },
+  {
+    name: "Sarah Chen",
+    role: "Fleet Manager, RapidMove",
+    content: "ROI immédiat : -60% de temps admin, +40% de missions traitées. L'équipe a adopté la solution en 1 semaine.",
+    rating: 5,
+    avatar: "SC"
+  }
+];
+
+const pricingPlans = [
+  {
+    name: "Starter",
+    price: "Gratuit",
+    description: "Parfait pour découvrir FleetChecks",
+    features: [
+      "5 missions par mois",
+      "Inspections de base", 
+      "Suivi GPS standard",
+      "Support email"
+    ],
+    color: "from-gray-500 to-gray-700",
+    popular: false
+  },
+  {
+    name: "Professional",
+    price: "49€",
+    period: "/mois",
+    description: "Idéal pour les professionnels actifs",
+    features: [
+      "Missions illimitées",
+      "Inspections avancées",
+      "GPS temps réel",
+      "Marketplace premium",
+      "Analytics détaillés",
+      "Support prioritaire"
+    ],
+    color: "from-blue-500 to-cyan-600",
+    popular: true
+  },
+  {
+    name: "Enterprise", 
+    price: "Custom",
+    description: "Solutions sur mesure pour entreprises",
+    features: [
+      "Tout Professional",
+      "API personnalisée",
+      "White-label",
+      "Formation dédiée",
+      "SLA garanti",
+      "Support 24/7"
+    ],
+    color: "from-purple-500 to-pink-600",
+    popular: false
+  }
+];
+
+const steps = [
+  {
+    number: 1,
+    title: "Créez votre compte",
+    description: "Inscription rapide avec 5 crédits offerts"
+  },
+  {
+    number: 2,
+    title: "Ajoutez votre équipe",
+    description: "Invitez convoyeurs et donneurs d'ordre"
+  },
+  {
+    number: 3,
+    title: "Créez une mission",
+    description: "Planifiez votre premier convoyage"
+  },
+  {
+    number: 4,
+    title: "Suivez et facturez",
+    description: "Gérez tout depuis votre tableau de bord"
+  }
+];
+
+export default function Landing() {
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
+  const [persona, setPersona] = useState<'entreprise' | 'convoyeur' | 'client'>('entreprise');
+  const [tone, setTone] = useState<'sales' | 'tech'>('sales');
+  const location = useLocation();
+
+  useEffect(() => {
+    const handleScroll = () => {
+      setScrolled(window.scrollY > 50);
+    };
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+  
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const t = params.get('tone');
+    setTone(t === 'tech' ? 'tech' : 'sales');
+  }, [location.search]);
+
+  const personaCopy = useMemo(() => {
+    const sales = {
+      entreprise: {
+        title: "Pilotez vos opérations de A à Z",
+        subtitle: "Planifiez vos missions, suivez vos véhicules, facturez en 1 clic et partagez des rapports irréprochables.",
+        bullets: [
+          "Missions illimitées et modèles personnalisés",
+          "Contrôles avec photos GPS et signatures",
+          "Tableaux de bord financiers et exports PDF"
+        ],
+        cta: { label: "Démarrer côté Entreprise", href: "/login?role=entreprise" }
+      },
+      convoyeur: {
+        title: "Votre assistant de mission mobile", 
+        subtitle: "Acceptez des missions, suivez vos trajets automatiquement et envoyez des rapports en un instant.",
+        bullets: [
+          "Application mobile optimisée terrain",
+          "Suivi GPS et preuves d'intervention", 
+          "Historique et avis clients pro"
+        ],
+        cta: { label: "Je suis convoyeur", href: "/login?role=convoyeur" }
+      },
+      client: {
+        title: "Transparence pour vos transports",
+        subtitle: "Recevez des liens de suivi, rapports d'inspection horodatés et preuve de livraison.",
+        bullets: [
+          "Lien de suivi en temps réel",
+          "Rapports photo avant / après",
+          "Preuve de livraison signée"
+        ],
+        cta: { label: "Accéder à mon espace", href: "/login?role=client" }
+      }
+    } as const;
+    return sales;
+  }, []);
+
+  return (
+    <div className="min-h-screen bg-background">
+      {/* Header modernisé */}
+      <header className={`border-b backdrop-blur-sm sticky top-0 z-50 transition-all duration-300 ${
+        scrolled ? 'bg-background/95 shadow-sm' : 'bg-card/50'
+      }`}>
+        <div className="container mx-auto px-4 py-4 flex justify-between items-center">
+          <div className="flex items-center gap-3">
+            <span className="font-extrabold tracking-tight text-[#00c8ff] text-2xl sm:text-3xl md:text-4xl select-none gradient-text">
+              {BRAND_NAME}
+            </span>
+          </div>
+          
+          {/* Navigation Desktop */}
+          <nav className="hidden md:flex items-center gap-8">
+            <div className="flex gap-1 bg-muted p-1 rounded-full">
+              {(['entreprise', 'convoyeur', 'client'] as const).map((p) => (
+                <button
+                  key={p}
+                  onClick={() => setPersona(p)}
+                  className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
+                    persona === p
+                      ? 'bg-primary text-primary-foreground shadow-sm'
+                      : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  {p.charAt(0).toUpperCase() + p.slice(1)}
+                </button>
+              ))}
+            </div>
+          </nav>
+
+          <div className="flex items-center gap-3">
+            <Button variant="ghost" asChild className="hidden sm:inline-flex">
+              <Link to="/login">Connexion</Link>
+            </Button>
+            <Button asChild className="gradient-bg">
+              <Link to="/login">S'inscrire</Link>
+            </Button>
+            
+            {/* Menu mobile */}
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className="md:hidden"
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            >
+              {mobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+            </Button>
+          </div>
+        </div>
+
+        {/* Menu mobile dropdown */}
+        {mobileMenuOpen && (
+          <div className="md:hidden bg-background border-t p-4 space-y-4">
+            <div className="flex gap-1 bg-muted p-1 rounded-full">
+              {(['entreprise', 'convoyeur', 'client'] as const).map((p) => (
+                <button
+                  key={p}
+                  onClick={() => setPersona(p)}
+                  className={`flex-1 px-3 py-2 rounded-full text-sm font-medium transition-all ${
+                    persona === p
+                      ? 'bg-primary text-primary-foreground'
+                      : 'text-muted-foreground'
+                  }`}
+                >
+                  {p.charAt(0).toUpperCase() + p.slice(1)}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+      </header>
+
+      {/* Hero Section enrichie */}
+      <section className="relative py-20 px-4 overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-primary/10 pointer-events-none" />
+        <div className="container mx-auto text-center max-w-4xl relative z-10">
+          <Badge variant="secondary" className="mb-6 animate-pulse">
+            ✨ Nouvelle génération de convoyage ✨
+          </Badge>
+          
+          <h1 className="text-4xl md:text-6xl font-bold mb-6 text-foreground gradient-text">
+            {personaCopy[persona]?.title}
+          </h1>
+          
+          <p className="text-xl text-muted-foreground mb-8 leading-relaxed">
+            {personaCopy[persona]?.subtitle}
+          </p>
+
+          <div className="flex flex-col sm:flex-row gap-4 justify-center mb-12">
+            <Button asChild size="lg" className="gradient-bg text-lg px-8">
+              <Link to={personaCopy[persona]?.cta.href}>
+                {personaCopy[persona]?.cta.label}
+                <ArrowRight className="ml-2 h-5 w-5" />
+              </Link>
+            </Button>
+            <Button variant="outline" size="lg" className="text-lg px-8 group">
+              <Play className="mr-2 h-5 w-5 group-hover:scale-110 transition-transform" />
+              Voir la démo
+            </Button>
+          </div>
+
+          {/* Stats */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mb-12">
+            {stats.map((stat, index) => (
+              <div key={index} className="text-center space-y-2 animate-fade-in" style={{ animationDelay: `${index * 100}ms` }}>
+                <div className="flex justify-center mb-2">
+                  <stat.icon className="h-8 w-8 text-primary" />
+                </div>
+                <div className="text-3xl font-bold text-foreground">{stat.value}</div>
+                <div className="text-sm text-muted-foreground">{stat.label}</div>
+              </div>
+            ))}
+          </div>
+
+          {/* Bullets spécifiques au persona */}
+          <div className="grid md:grid-cols-3 gap-6 max-w-3xl mx-auto">
+            {personaCopy[persona]?.bullets.map((bullet, index) => (
+              <div key={index} className="flex items-center gap-3 p-4 bg-card rounded-lg shadow-sm">
+                <CheckCircle className="h-5 w-5 text-green-500 shrink-0" />
+                <span className="text-sm font-medium">{bullet}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+            Simplifiez votre <span className="text-primary">convoyage</span> et vos <span className="text-primary">inspections</span>
+          </h1>
+          <p className="text-xl text-muted-foreground mb-8 max-w-2xl mx-auto">
+            La solution complète pour gérer vos missions de convoyage, inspecter vos véhicules et facturer vos clients en toute simplicité.
+          </p>
+          <div className="flex gap-4 justify-center">
+            <Button size="lg" asChild>
+              <Link to="/login">
+                Essayer gratuitement
+                <ArrowRight className="ml-2 w-4 h-4" />
+              </Link>
+            </Button>
+            <Button size="lg" variant="outline">
+              Voir la démonstration
+            </Button>
+          </div>
+          <p className="text-sm text-muted-foreground mt-4">
+            ✨ 5 crédits offerts · Aucune carte bancaire requise
+          </p>
+        </div>
+      </section>
+
+      {/* App Showcase */}
+      <section className="py-20 px-4 bg-muted/20">
+        <div className="container mx-auto">
+          <div className="text-center mb-16">
+            <h2 className="text-3xl font-bold mb-4 text-foreground">
+              Disponible partout, à tout moment
+            </h2>
+            <p className="text-xl text-muted-foreground">
+              {BRAND_NAME} s'adapte à votre façon de travailler : sur mobile ou ordinateur
+            </p>
+          </div>
+          
+          <div className="grid lg:grid-cols-2 gap-12 max-w-6xl mx-auto">
+            {/* Mobile App */}
+            <div className="text-center">
+              <div className="mb-8">
+                <div className="inline-flex items-center gap-2 mb-4">
+                  <Smartphone className="w-6 h-6 text-primary" />
+                  <h3 className="text-2xl font-bold text-foreground">Application Mobile</h3>
+                </div>
+                <p className="text-muted-foreground mb-6">
+                  Gérez vos missions en déplacement avec notre app mobile intuitive
+                </p>
+              </div>
+              
+              <div className="relative mx-auto max-w-sm">
+                <img 
+                  src={mobileAppMockup} 
+                  alt={`${BRAND_NAME} App Mobile`} 
+                  className="w-full h-auto rounded-2xl shadow-2xl"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-background/20 to-transparent rounded-2xl"></div>
+              </div>
+              
+              <div className="mt-6 space-y-2">
+                <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
+                  <CheckCircle className="w-4 h-4 text-primary" />
+                  <span>Inspection véhicules sur le terrain</span>
+                </div>
+                <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
+                  <CheckCircle className="w-4 h-4 text-primary" />
+                  <span>Suivi GPS en temps réel</span>
+                </div>
+                <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
+                  <CheckCircle className="w-4 h-4 text-primary" />
+                  <span>Photos et rapports instantanés</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Web App */}
+            <div className="text-center">
+              <div className="mb-8">
+                <div className="inline-flex items-center gap-2 mb-4">
+                  <Monitor className="w-6 h-6 text-primary" />
+                  <h3 className="text-2xl font-bold text-foreground">Application Web</h3>
+                </div>
+                <p className="text-muted-foreground mb-6">
+                  Tableau de bord complet pour gérer toute votre activité
+                </p>
+              </div>
+              
+              <div className="relative">
+                <img 
+                  src={webAppMockup} 
+                  alt={`${BRAND_NAME} Dashboard Web`} 
+                  className="w-full h-auto rounded-xl shadow-2xl"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-background/20 to-transparent rounded-xl"></div>
+              </div>
+              
+              <div className="mt-6 space-y-2">
+                <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
+                  <CheckCircle className="w-4 h-4 text-primary" />
+                  <span>Dashboard analytiques avancés</span>
+                </div>
+                <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
+                  <CheckCircle className="w-4 h-4 text-primary" />
+                  <span>Gestion complète des équipes</span>
+                </div>
+                <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
+                  <CheckCircle className="w-4 h-4 text-primary" />
+                  <span>Facturation automatisée</span>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <div className="text-center mt-12">
+            <Button size="lg" asChild>
+              <Link to="/login">
+                <Smartphone className="mr-2 w-5 h-5" />
+                Essayer sur mobile et web
+              </Link>
+            </Button>
+          </div>
+        </div>
+      </section>
+
+      {/* Features */}
+      <section className="py-20 px-4">
+        <div className="container mx-auto">
+          <div className="text-center mb-16">
+            <h2 className="text-3xl font-bold mb-4 text-foreground">Tout ce dont vous avez besoin</h2>
+            <p className="text-xl text-muted-foreground">
+              Une plateforme complète pour votre activité de convoyage
+            </p>
+          </div>
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8 max-w-6xl mx-auto">
+            {features.map((feature, index) => (
+              <Card key={index} className="border-border/50 hover:shadow-lg transition-shadow">
+                <CardHeader>
+                  <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center mb-4">
+                    <feature.icon className="w-6 h-6 text-primary" />
+                  </div>
+                  <CardTitle className="text-xl">{feature.title}</CardTitle>
+                  <CardDescription>{feature.description}</CardDescription>
+                </CardHeader>
+              </Card>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* How it works */}
+      <section className="py-20 px-4">
+        <div className="container mx-auto">
+          <div className="text-center mb-16">
+            <h2 className="text-3xl font-bold mb-4 text-foreground">Comment ça marche ?</h2>
+            <p className="text-xl text-muted-foreground">
+              Démarrez en 4 étapes simples
+            </p>
+          </div>
+          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8 max-w-6xl mx-auto">
+            {steps.map((step, index) => (
+              <div key={index} className="text-center">
+                <div className="w-16 h-16 bg-primary rounded-full flex items-center justify-center mx-auto mb-4">
+                  <span className="text-2xl font-bold text-primary-foreground">{step.number}</span>
+                </div>
+                <h3 className="text-xl font-semibold mb-2 text-foreground">{step.title}</h3>
+                <p className="text-muted-foreground">{step.description}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Pricing */}
+      <section className="py-20 px-4 bg-muted/20">
+        <div className="container mx-auto">
+          <div className="text-center mb-16">
+            <h2 className="text-3xl font-bold mb-4 text-foreground">Nos tarifs simples</h2>
+            <p className="text-xl text-muted-foreground">
+              1 crédit = 1 action (créer une mission ou une facture)
+            </p>
+          </div>
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6 max-w-full mx-auto">
+            {plans.map((plan, index) => (
+              <Card key={index} className={`relative ${plan.popular ? 'ring-2 ring-primary' : ''} border-border/50`}>
+                {plan.popular && (
+                  <Badge className="absolute -top-2 left-1/2 transform -translate-x-1/2 bg-primary">
+                    ⭐ Populaire
+                  </Badge>
+                )}
+                <CardHeader className="text-center">
+                  <CardTitle className="text-2xl">{plan.name}</CardTitle>
+                  <div className="text-3xl font-bold text-primary">
+                    {plan.price}
+                  </div>
+                  {plan.credits && (
+                    <p className="text-muted-foreground">{plan.credits} crédits</p>
+                  )}
+                  <CardDescription>{plan.description}</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <ul className="space-y-3">
+                    {plan.features.map((feature, idx) => (
+                      <li key={idx} className="flex items-center gap-2">
+                        <CheckCircle className="w-4 h-4 text-primary" />
+                        <span className="text-sm">{feature}</span>
+                      </li>
+                    ))}
+                  </ul>
+                  <Button 
+                    className={`w-full mt-6 ${plan.popular ? '' : 'variant-outline'}`}
+                    variant={plan.popular ? "default" : "outline"}
+                    asChild
+                  >
+                    {plan.name === "Découverte" ? (
+                      <Link to="/login">
+                        Commencer gratuitement
+                      </Link>
+                    ) : (
+                      <Link to="/shop">
+                        Acheter ce pack
+                      </Link>
+                    )}
+                  </Button>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* CTA */}
+      <section className="py-20 px-4">
+        <div className="container mx-auto text-center max-w-3xl">
+          <h2 className="text-3xl font-bold mb-6 text-foreground">
+            Prêt à simplifier votre convoyage ?
+          </h2>
+          <p className="text-xl text-muted-foreground mb-8">
+            Rejoignez les professionnels qui font confiance à {BRAND_NAME} pour gérer leurs missions de convoyage.
+          </p>
+          <Button size="lg" asChild>
+            <Link to="/login">
+              Commencer maintenant
+              <ArrowRight className="ml-2 w-4 h-4" />
+            </Link>
+          </Button>
+          <div className="flex justify-center items-center gap-8 mt-12 text-sm text-muted-foreground">
+            <div className="flex items-center gap-2">
+              <CheckCircle className="w-4 h-4 text-primary" />
+              <span>5 crédits offerts</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Clock className="w-4 h-4 text-primary" />
+              <span>Prêt en 2 minutes</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Shield className="w-4 h-4 text-primary" />
+              <span>Données sécurisées</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Footer */}
+      <footer className="border-t bg-card/50 py-12 px-4">
+        <div className="container mx-auto text-center">
+          <div className="flex items-center justify-center gap-3 mb-4">
+            <span className="font-extrabold tracking-tight text-[#00c8ff] text-xl select-none">{BRAND_NAME}</span>
+          </div>
+          <div className="text-muted-foreground mb-4">
+            <p>La solution moderne pour le convoyage professionnel</p>
+            <p>© 2024 {BRAND_NAME}. Tous droits réservés.</p>
+            <p>
+              Version {typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : 'dev'} · Build {typeof __BUILD_TIME__ !== 'undefined' ? new Date(__BUILD_TIME__).toLocaleString() : 'dev'}
+            </p>
+          </div>
+        </div>
+      </footer>
+    </div>
+  );
+}

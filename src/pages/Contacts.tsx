@@ -1,280 +1,565 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { 
   useMyContacts, 
   useAddContact
 } from '@/hooks/useContacts';
 import { useSearchProfiles } from '@/hooks/useProfiles';
+import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { AvatarFallback } from '@/components/ui/avatar'; // Legacy fallback gardé si besoin ailleurs
+import UserAvatar from '@/components/UserAvatar';
+import { Badge } from '@/components/ui/badge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Separator } from '@/components/ui/separator';
 import { 
   ArrowLeft, Plus, Search, Users, Mail, 
   ClipboardList, UserPlus, Activity, Clock, 
-  Calendar, Target, Briefcase
+  Calendar, Target, Briefcase, Phone, MapPin,
+  MessageSquare, UserCheck, Filter, 
+  MoreHorizontal, Edit3, Trash2, Send,
+  CheckCircle, XCircle, AlertCircle, Globe
 } from 'lucide-react';
 
-const TeamManager = () => {
+interface Contact {
+  id: string;
+  user_id: string;
+  email: string;
+  name: string | null;
+  status: 'pending' | 'accepted' | 'declined' | 'active';
+  invited_user_id: string | null;
+  invited_at: string;
+  accepted_at?: string | null;
+  declined_at?: string | null;
+  created_at: string;
+  updated_at: string;
+  missions_count?: number;
+}
+
+interface Profile {
+  id: string;
+  user_id: string;
+  full_name: string | null;
+  email: string;
+  avatar_url: string | null;
+  phone?: string | null;
+  location?: string | null;
+  bio?: string | null;
+  is_convoyeur_confirme?: boolean;
+  verification_status?: 'pending' | 'approved' | 'rejected';
+  created_at: string;
+  updated_at: string;
+}
+
+const ContactsManager = () => {
+  const { user } = useAuth();
   const navigate = useNavigate();
-  const [search, setSearch] = useState('');
-  const [emailSearch, setEmailSearch] = useState('');
+  const [activeTab, setActiveTab] = useState('all');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [emailInvite, setEmailInvite] = useState('');
+  const [selectedStatus, setSelectedStatus] = useState<string>('all');
+  const [allProfiles, setAllProfiles] = useState<Profile[]>([]);
+  const [loading, setLoading] = useState(true);
   
-  const { data: contactsData, isLoading: contactsLoading } = useMyContacts(0, 50, search);
-  const { data: profileResults, isLoading: profilesLoading } = useSearchProfiles(emailSearch);
+  const { data: contactsData, isLoading: contactsLoading } = useMyContacts(0, 100, searchQuery);
+  const { data: profileResults } = useSearchProfiles(emailInvite);
   const addContact = useAddContact();
 
-  const myTeam = contactsData?.data?.filter(contact => contact.status === 'accepted') || [];
+  const contacts = contactsData?.data || [];
+  const pendingContacts = contacts.filter(c => c.status === 'pending');
+  const acceptedContacts = contacts.filter(c => c.status === 'accepted' || c.status === 'active');
 
-  const handleAddContact = async (email: string, name: string) => {
+  // Charger tous les profils utilisateurs
+  useEffect(() => {
+    const loadProfiles = async () => {
+      if (!user) return;
+      
+      try {
+        const { data: profiles, error } = await supabase
+          .from('profiles')
+          .select('*')
+          .neq('user_id', user.id)
+          .order('full_name', { ascending: true });
+
+        if (error) throw error;
+        
+        // Cast to Profile type with proper verification_status handling
+        const typedProfiles = (profiles || []).map(p => ({
+          ...p,
+          verification_status: (p.verification_status as 'pending' | 'approved' | 'rejected') || 'pending'
+        })) as Profile[];
+        
+        setAllProfiles(typedProfiles);
+      } catch (error) {
+        console.error('Error loading profiles:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadProfiles();
+
+    // Écouter les changements en temps réel
+    const channel = supabase
+      .channel('profiles-realtime')
+      .on('postgres_changes', { 
+        event: '*', 
+        schema: 'public', 
+        table: 'profiles' 
+      }, (payload) => {
+        console.log('[RTC] Profile change:', payload);
+        
+        if (payload.eventType === 'INSERT') {
+          const newProfile = payload.new as Profile;
+          if (newProfile.user_id !== user?.id) {
+            setAllProfiles(prev => [...prev, newProfile]);
+          }
+        } else if (payload.eventType === 'UPDATE') {
+          const updatedProfile = payload.new as Profile;
+          setAllProfiles(prev => prev.map(p => 
+            p.user_id === updatedProfile.user_id ? updatedProfile : p
+          ));
+        } else if (payload.eventType === 'DELETE') {
+          const deletedProfile = payload.old as Profile;
+          setAllProfiles(prev => prev.filter(p => p.user_id !== deletedProfile.user_id));
+        }
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user]);
+
+  // Filtrer les profils
+  const filteredProfiles = allProfiles.filter(profile => {
+    const matchesSearch = !searchQuery || 
+      profile.full_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      profile.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      profile.bio?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      profile.location?.toLowerCase().includes(searchQuery.toLowerCase());
+    
+    const matchesStatus = selectedStatus === 'all' || 
+      (selectedStatus === 'verified' && profile.is_convoyeur_confirme) ||
+      (selectedStatus === 'pending' && profile.verification_status === 'pending');
+    
+    return matchesSearch && matchesStatus;
+  });
+
+  const handleInviteContact = async (email: string, name: string) => {
     try {
       await addContact.mutateAsync({
         email,
         name: name || email.split('@')[0],
       });
-      setEmailSearch('');
+      setEmailInvite('');
     } catch (error) {
-      console.error('Error adding contact:', error);
+      console.error('Error inviting contact:', error);
     }
   };
 
-  const handleCreateMission = (contact: any) => {
-    // Redirection directe vers la page de création de mission avec le contact pré-assigné
+  const handleCreateMission = (contact: Profile | Contact) => {
     const queryParams = new URLSearchParams({
       assigned_to: 'contact',
       assigned_contact_id: contact.id,
-      assigned_contact_name: contact.name || contact.email.split('@')[0],
+      assigned_contact_name: 'name' in contact ? (contact.name || contact.email.split('@')[0]) : (contact.full_name || contact.email.split('@')[0]),
       assigned_contact_email: contact.email
     });
     
     navigate(`/missions/new?${queryParams.toString()}`);
   };
 
+  const getStatusBadge = (status: Contact['status']) => {
+    switch (status) {
+      case 'pending':
+        return <Badge variant="secondary" className="bg-yellow-500/20 text-yellow-400"><Clock className="w-3 h-3 mr-1" />En attente</Badge>;
+      case 'accepted':
+      case 'active':
+        return <Badge variant="secondary" className="bg-green-500/20 text-green-400"><CheckCircle className="w-3 h-3 mr-1" />Accepté</Badge>;
+      case 'declined':
+        return <Badge variant="secondary" className="bg-red-500/20 text-red-400"><XCircle className="w-3 h-3 mr-1" />Refusé</Badge>;
+      default:
+        return null;
+    }
+  };
+
   return (
-    <div className="min-h-screen">
-      <div className="max-w-6xl mx-auto p-6 space-y-8">
-        {/* Header */}
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
+      <div className="max-w-7xl mx-auto p-6 space-y-6">
+        {/* Header moderne */}
         <div className="relative">
-          <div className="absolute inset-0 bg-gradient-to-r from-blue-600/20 via-purple-600/20 to-teal-600/20 rounded-3xl blur-xl"></div>
-          <div className="relative bg-slate-900/60 backdrop-blur-xl border border-slate-800/60 rounded-3xl p-8 shadow-2xl">
-            <div className="flex items-center justify-between mb-8">
-              <div className="flex items-center gap-6">
-                <Button variant="ghost" size="sm" asChild className="text-slate-300 hover:text-white hover:bg-slate-700/50">
-                  <Link to="/dashboard">
-                    <ArrowLeft className="w-4 h-4 mr-2" />
-                    Retour
-                  </Link>
-                </Button>
-                
+          <div className="absolute inset-0 bg-gradient-to-r from-blue-600/10 via-purple-600/10 to-teal-600/10 rounded-2xl blur-xl"></div>
+          <Card className="relative bg-slate-900/70 backdrop-blur-xl border-slate-700/50">
+            <CardHeader className="pb-4">
+              <div className="flex items-center justify-between">
                 <div className="flex items-center gap-4">
-                  <div className="relative">
-                    <div className="w-16 h-16 bg-gradient-to-r from-blue-500 via-teal-500 to-purple-500 rounded-2xl flex items-center justify-center shadow-lg">
-                      <Users className="w-8 h-8 text-white" />
+                  <Button variant="ghost" size="sm" asChild className="text-slate-300 hover:text-white">
+                    <Link to="/dashboard">
+                      <ArrowLeft className="w-4 h-4 mr-2" />
+                      Tableau de bord
+                    </Link>
+                  </Button>
+                  
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-teal-500 rounded-xl flex items-center justify-center">
+                      <Users className="w-6 h-6 text-white" />
                     </div>
-                    <div className="absolute -top-1 -right-1 w-6 h-6 bg-teal-500 rounded-full flex items-center justify-center">
-                      <Briefcase className="w-3 h-3 text-white" />
+                    <div>
+                      <h1 className="text-2xl font-bold text-white">
+                        Gestion des Contacts
+                      </h1>
+                      <p className="text-slate-400">
+                        Gérez votre réseau professionnel et vos collaborations
+                      </p>
                     </div>
                   </div>
-                  
-                  <div>
-                    <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-400 via-teal-400 to-purple-400 bg-clip-text text-transparent">
-                      Gestionnaire d'Équipe
-                    </h1>
-                    <p className="text-slate-400 text-lg">
-                      Gérez vos collaborateurs et assignez des missions
-                    </p>
+                </div>
+
+                {/* Stats rapides */}
+                <div className="flex gap-6 text-sm">
+                  <div className="text-center">
+                    <div className="text-xl font-bold text-blue-400">{allProfiles.length}</div>
+                    <div className="text-slate-400">Profils</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-xl font-bold text-teal-400">{acceptedContacts.length}</div>
+                    <div className="text-slate-400">Contacts</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-xl font-bold text-purple-400">{pendingContacts.length}</div>
+                    <div className="text-slate-400">En attente</div>
                   </div>
                 </div>
               </div>
-            </div>
-
-            {/* Stats rapides */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <Card className="bg-gradient-to-r from-blue-500/10 to-blue-600/10 border-blue-500/20 backdrop-blur-sm">
-                <CardContent className="p-4 text-center">
-                  <Users className="w-6 h-6 text-blue-400 mx-auto mb-2" />
-                  <div className="text-2xl font-bold text-white">{myTeam.length}</div>
-                  <div className="text-xs text-slate-400">Membres actifs</div>
-                </CardContent>
-              </Card>
-
-              <Card className="bg-gradient-to-r from-teal-500/10 to-teal-600/10 border-teal-500/20 backdrop-blur-sm">
-                <CardContent className="p-4 text-center">
-                  <ClipboardList className="w-6 h-6 text-teal-400 mx-auto mb-2" />
-                  <div className="text-2xl font-bold text-white">12</div>
-                  <div className="text-xs text-slate-400">Missions en cours</div>
-                </CardContent>
-              </Card>
-
-              <Card className="bg-gradient-to-r from-purple-500/10 to-purple-600/10 border-purple-500/20 backdrop-blur-sm">
-                <CardContent className="p-4 text-center">
-                  <Target className="w-6 h-6 text-purple-400 mx-auto mb-2" />
-                  <div className="text-2xl font-bold text-white">87</div>
-                  <div className="text-xs text-slate-400">Missions terminées</div>
-                </CardContent>
-              </Card>
-
-              <Card className="bg-gradient-to-r from-orange-500/10 to-orange-600/10 border-orange-500/20 backdrop-blur-sm">
-                <CardContent className="p-4 text-center">
-                  <Activity className="w-6 h-6 text-orange-400 mx-auto mb-2" />
-                  <div className="text-2xl font-bold text-white">94%</div>
-                  <div className="text-xs text-slate-400">Taux de succès</div>
-                </CardContent>
-              </Card>
-            </div>
-          </div>
+            </CardHeader>
+          </Card>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Section Ajouter un membre */}
-          <Card className="bg-slate-800/50 border-slate-700/50 backdrop-blur-sm">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-3 text-white">
-                <UserPlus className="w-5 h-5 text-teal-400" />
-                Ajouter un Membre
-              </CardTitle>
-              <CardDescription className="text-slate-400">
-                Recherchez par adresse email pour inviter un nouveau membre
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label className="text-slate-200">Adresse email</Label>
-                <div className="relative">
-                  <Mail className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
-                  <Input
-                    type="email"
-                    value={emailSearch}
-                    onChange={(e) => setEmailSearch(e.target.value)}
-                    placeholder="membre@exemple.com"
-                    className="pl-10 bg-slate-700/50 border-slate-600/50 text-white placeholder:text-slate-400 focus:border-teal-500 focus:ring-1 focus:ring-teal-500"
-                  />
-                </div>
+        {/* Navigation par onglets */}
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <div className="flex items-center justify-between mb-6">
+            <TabsList className="bg-slate-800/50 border-slate-700/50">
+              <TabsTrigger value="all" className="flex items-center gap-2">
+                <Globe className="w-4 h-4" />
+                Tous les profils ({allProfiles.length})
+              </TabsTrigger>
+              <TabsTrigger value="contacts" className="flex items-center gap-2">
+                <UserCheck className="w-4 h-4" />
+                Mes contacts ({acceptedContacts.length})
+              </TabsTrigger>
+              <TabsTrigger value="pending" className="flex items-center gap-2">
+                <Clock className="w-4 h-4" />
+                Invitations ({pendingContacts.length})
+              </TabsTrigger>
+              <TabsTrigger value="invite" className="flex items-center gap-2">
+                <UserPlus className="w-4 h-4" />
+                Inviter
+              </TabsTrigger>
+            </TabsList>
+
+            {/* Filtres et recherche */}
+            <div className="flex items-center gap-3">
+              <div className="relative">
+                <Search className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
+                <Input
+                  placeholder="Rechercher..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-10 w-64 bg-slate-800/50 border-slate-600/50 text-white placeholder:text-slate-400"
+                />
               </div>
+              
+              <select 
+                value={selectedStatus} 
+                onChange={(e) => setSelectedStatus(e.target.value)}
+                className="px-3 py-2 bg-slate-800/50 border border-slate-600/50 rounded-md text-white text-sm"
+              >
+                <option value="all">Tous les statuts</option>
+                <option value="verified">Vérifiés uniquement</option>
+                <option value="pending">En attente</option>
+              </select>
+            </div>
+          </div>
 
-              {/* Suggestions de profils */}
-              {emailSearch && profileResults && profileResults.length > 0 && (
-                <div className="space-y-2 max-h-48 overflow-y-auto">
-                  <Label className="text-slate-200 text-sm">Suggestions :</Label>
-                  {profileResults.map(profile => (
-                    <div 
-                      key={profile.id} 
-                      className="flex items-center justify-between p-3 bg-slate-700/30 border border-slate-600/50 rounded-lg hover:bg-slate-700/50 transition-all duration-300 group cursor-pointer"
-                      onClick={() => handleAddContact(profile.email, profile.full_name || profile.email.split('@')[0])}
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 bg-gradient-to-r from-teal-500 to-blue-500 rounded-full flex items-center justify-center">
-                          <span className="text-white font-semibold text-sm">
-                            {(profile.full_name || profile.email).charAt(0).toUpperCase()}
-                          </span>
-                        </div>
-                        <div>
-                          <p className="font-semibold text-white">
-                            {profile.full_name || profile.email.split('@')[0]}
-                          </p>
-                          <p className="text-xs text-slate-400">Cliquer pour ajouter</p>
-                        </div>
-                      </div>
-                      <Plus className="w-4 h-4 text-teal-400 group-hover:scale-110 transition-transform" />
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {emailSearch && profilesLoading && (
-                <div className="flex items-center justify-center py-4">
-                  <div className="w-6 h-6 border-2 border-slate-600 border-t-teal-500 rounded-full animate-spin"></div>
-                  <span className="ml-2 text-slate-400">Recherche...</span>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Section Mon Équipe */}
-          <div className="lg:col-span-2">
-            <Card className="bg-slate-800/50 border-slate-700/50 backdrop-blur-sm">
+          {/* Contenu des onglets */}
+          <TabsContent value="all" className="mt-0">
+            <Card className="bg-slate-800/50 border-slate-700/50">
               <CardHeader>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <CardTitle className="flex items-center gap-3 text-white">
-                      <Users className="w-5 h-5 text-blue-400" />
-                      Mon Équipe ({myTeam.length})
-                    </CardTitle>
-                    <CardDescription className="text-slate-400">
-                      Vos collaborateurs actifs et leurs missions
-                    </CardDescription>
-                  </div>
-                  
-                  <div className="relative">
-                    <Search className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
-                    <Input
-                      placeholder="Rechercher..."
-                      value={search}
-                      onChange={(e) => setSearch(e.target.value)}
-                      className="pl-10 w-64 bg-slate-700/50 border-slate-600/50 text-white placeholder:text-slate-400"
-                    />
-                  </div>
-                </div>
+                <CardTitle className="text-white">Tous les Profils ({filteredProfiles.length})</CardTitle>
+                <CardDescription className="text-slate-400">
+                  Liste complète des utilisateurs de la plateforme
+                </CardDescription>
               </CardHeader>
               <CardContent>
-                {contactsLoading ? (
+                {loading ? (
                   <div className="flex items-center justify-center py-12">
                     <div className="w-8 h-8 border-2 border-slate-600 border-t-blue-500 rounded-full animate-spin"></div>
-                    <span className="ml-3 text-slate-400">Chargement de l'équipe...</span>
+                    <span className="ml-3 text-slate-400">Chargement...</span>
                   </div>
-                ) : myTeam.length === 0 ? (
+                ) : filteredProfiles.length === 0 ? (
                   <div className="text-center py-12">
-                    <div className="w-16 h-16 bg-gradient-to-r from-slate-600 to-slate-500 rounded-full flex items-center justify-center mx-auto mb-4">
-                      <Users className="w-8 h-8 text-white" />
-                    </div>
-                    <h3 className="text-lg font-semibold text-white mb-2">Aucun membre dans l'équipe</h3>
-                    <p className="text-slate-400 mb-6">Commencez par ajouter votre premier collaborateur</p>
+                    <Users className="w-16 h-16 text-slate-600 mx-auto mb-4" />
+                    <h3 className="text-lg font-semibold text-white mb-2">
+                      {searchQuery ? 'Aucun résultat' : 'Aucun profil trouvé'}
+                    </h3>
+                    <p className="text-slate-400">
+                      {searchQuery ? `Aucun profil ne correspond à "${searchQuery}"` : 'Aucun utilisateur enregistré'}
+                    </p>
                   </div>
                 ) : (
-                  <div className="space-y-4">
-                    {myTeam.map((member) => (
-                      <div 
-                        key={member.id}
-                        className="group flex items-center justify-between p-4 bg-slate-700/30 border border-slate-600/50 rounded-xl hover:bg-slate-700/50 transition-all duration-300"
-                      >
-                        <div className="flex items-center gap-4">
-                          <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-teal-500 rounded-full flex items-center justify-center">
-                            <span className="text-white font-bold text-lg">
-                              {(member.name || member.email).charAt(0).toUpperCase()}
-                            </span>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {filteredProfiles.map((profile) => (
+                      <Card key={profile.user_id} className="bg-slate-700/30 border-slate-600/50 hover:bg-slate-700/50 transition-all duration-300 group">
+                        <CardContent className="p-4">
+                          <div className="flex items-start gap-3 mb-3">
+                            <UserAvatar src={profile.avatar_url || undefined} name={profile.full_name || profile.email} className="w-12 h-12 ring-2 ring-slate-600 group-hover:ring-blue-400 transition-all" />
+                            
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 mb-1">
+                                <h3 className="font-semibold text-white text-sm truncate">
+                                  {profile.full_name || profile.email.split('@')[0]}
+                                </h3>
+                                {profile.is_convoyeur_confirme && (
+                                  <Badge variant="secondary" className="bg-green-500/20 text-green-400 text-xs">
+                                    Vérifié
+                                  </Badge>
+                                )}
+                              </div>
+                              
+                              <p className="text-slate-400 text-xs truncate mb-2">
+                                <Mail className="w-3 h-3 inline mr-1" />
+                                {profile.email}
+                              </p>
+                              
+                              {profile.location && (
+                                <p className="text-slate-400 text-xs truncate mb-1">
+                                  <MapPin className="w-3 h-3 inline mr-1" />
+                                  {profile.location}
+                                </p>
+                              )}
+                              
+                              {profile.phone && (
+                                <p className="text-slate-400 text-xs truncate">
+                                  <Phone className="w-3 h-3 inline mr-1" />
+                                  {profile.phone}
+                                </p>
+                              )}
+                            </div>
                           </div>
-                          
-                          <div>
-                            <h3 className="font-semibold text-white text-lg">
-                              {member.name || member.email.split('@')[0]}
-                            </h3>
-                            <p className="text-slate-400 text-sm">
-                              {member.missions_count || 0} mission{(member.missions_count || 0) !== 1 ? 's' : ''}
-                            </p>
-                          </div>
-                        </div>
 
-                        <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                          <Button 
-                            size="sm"
-                            onClick={() => handleCreateMission(member)}
-                            className="bg-gradient-to-r from-teal-500 to-blue-500 hover:from-teal-600 hover:to-blue-600 text-white shadow-lg"
-                          >
-                            <ClipboardList className="w-4 h-4 mr-2" />
-                            Nouvelle Mission
-                          </Button>
-                        </div>
-                      </div>
+                          <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                            <Button size="sm" variant="outline" className="flex-1 h-8 bg-slate-600/50 border-slate-500/50 text-white hover:bg-blue-500/20">
+                              <MessageSquare className="w-3 h-3 mr-1" />
+                              Message
+                            </Button>
+                            <Button size="sm" onClick={() => handleCreateMission(profile)} className="flex-1 h-8 bg-gradient-to-r from-teal-500 to-blue-500 hover:from-teal-600 hover:to-blue-600">
+                              <ClipboardList className="w-3 h-3 mr-1" />
+                              Mission
+                            </Button>
+                          </div>
+                        </CardContent>
+                      </Card>
                     ))}
                   </div>
                 )}
               </CardContent>
             </Card>
-          </div>
-        </div>
+          </TabsContent>
+
+          <TabsContent value="contacts" className="mt-0">
+            <Card className="bg-slate-800/50 border-slate-700/50">
+              <CardHeader>
+                <CardTitle className="text-white">Mes Contacts ({acceptedContacts.length})</CardTitle>
+                <CardDescription className="text-slate-400">
+                  Vos contacts confirmés et collaborateurs actifs
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {acceptedContacts.length === 0 ? (
+                  <div className="text-center py-12">
+                    <UserCheck className="w-16 h-16 text-slate-600 mx-auto mb-4" />
+                    <h3 className="text-lg font-semibold text-white mb-2">Aucun contact confirmé</h3>
+                    <p className="text-slate-400 mb-4">Commencez par inviter des collaborateurs</p>
+                    <Button onClick={() => setActiveTab('invite')} className="bg-gradient-to-r from-blue-500 to-teal-500">
+                      <UserPlus className="w-4 h-4 mr-2" />
+                      Inviter un contact
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {acceptedContacts.map((contact) => (
+                      <Card key={contact.id} className="bg-slate-700/30 border-slate-600/50">
+                        <CardContent className="p-4">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                              <UserAvatar className="w-10 h-10" name={contact.name || contact.email} />
+                              <div>
+                                <h3 className="font-semibold text-white">
+                                  {contact.name || contact.email.split('@')[0]}
+                                </h3>
+                                <p className="text-slate-400 text-sm">{contact.email}</p>
+                                {contact.accepted_at && (
+                                  <p className="text-slate-500 text-xs">
+                                    Accepté le {new Date(contact.accepted_at).toLocaleDateString('fr-FR')}
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                            
+                            <div className="flex items-center gap-2">
+                              {getStatusBadge(contact.status)}
+                              <Button size="sm" onClick={() => handleCreateMission(contact)}>
+                                <ClipboardList className="w-3 h-3 mr-1" />
+                                Mission
+                              </Button>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="pending" className="mt-0">
+            <Card className="bg-slate-800/50 border-slate-700/50">
+              <CardHeader>
+                <CardTitle className="text-white">Invitations en attente ({pendingContacts.length})</CardTitle>
+                <CardDescription className="text-slate-400">
+                  Invitations envoyées en attente de réponse
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {pendingContacts.length === 0 ? (
+                  <div className="text-center py-12">
+                    <Clock className="w-16 h-16 text-slate-600 mx-auto mb-4" />
+                    <h3 className="text-lg font-semibold text-white mb-2">Aucune invitation en attente</h3>
+                    <p className="text-slate-400">Toutes vos invitations ont été traitées</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {pendingContacts.map((contact) => (
+                      <Card key={contact.id} className="bg-slate-700/30 border-slate-600/50">
+                        <CardContent className="p-4">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                              <UserAvatar className="w-10 h-10" name={contact.name || contact.email} />
+                              <div>
+                                <h3 className="font-semibold text-white">
+                                  {contact.name || contact.email.split('@')[0]}
+                                </h3>
+                                <p className="text-slate-400 text-sm">{contact.email}</p>
+                                <p className="text-slate-500 text-xs">
+                                  Invité le {new Date(contact.invited_at).toLocaleDateString('fr-FR')}
+                                </p>
+                              </div>
+                            </div>
+                            
+                            <div className="flex items-center gap-2">
+                              {getStatusBadge(contact.status)}
+                              <Button size="sm" variant="outline">
+                                <Send className="w-3 h-3 mr-1" />
+                                Relancer
+                              </Button>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="invite" className="mt-0">
+            <Card className="bg-slate-800/50 border-slate-700/50">
+              <CardHeader>
+                <CardTitle className="text-white">Inviter un nouveau contact</CardTitle>
+                <CardDescription className="text-slate-400">
+                  Recherchez et invitez de nouveaux collaborateurs
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label className="text-slate-200">Adresse email</Label>
+                    <div className="relative">
+                      <Mail className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
+                      <Input
+                        type="email"
+                        value={emailInvite}
+                        onChange={(e) => setEmailInvite(e.target.value)}
+                        placeholder="contact@exemple.com"
+                        className="pl-10 bg-slate-700/50 border-slate-600/50 text-white placeholder:text-slate-400 focus:border-teal-500 focus:ring-1 focus:ring-teal-500"
+                      />
+                    </div>
+                  </div>
+
+                  {emailInvite && profileResults && profileResults.length > 0 && (
+                    <div className="space-y-3">
+                      <Label className="text-slate-200 text-sm">Suggestions :</Label>
+                      <div className="grid gap-2 max-h-60 overflow-y-auto">
+                        {profileResults.map(profile => (
+                          <Card 
+                            key={profile.id} 
+                            className="bg-slate-700/30 border-slate-600/50 hover:bg-slate-700/50 transition-all cursor-pointer"
+                            onClick={() => handleInviteContact(profile.email, profile.full_name || profile.email.split('@')[0])}
+                          >
+                            <CardContent className="p-3">
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-3">
+                                  <UserAvatar className="w-8 h-8" name={profile.full_name || profile.email} />
+                                  <div>
+                                    <p className="font-semibold text-white text-sm">
+                                      {profile.full_name || profile.email.split('@')[0]}
+                                    </p>
+                                    <p className="text-slate-400 text-xs">{profile.email}</p>
+                                  </div>
+                                </div>
+                                <Button size="sm" className="bg-gradient-to-r from-teal-500 to-blue-500">
+                                  <UserPlus className="w-3 h-3 mr-1" />
+                                  Inviter
+                                </Button>
+                              </div>
+                            </CardContent>
+                          </Card>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  <Button 
+                    onClick={() => emailInvite && handleInviteContact(emailInvite, emailInvite.split('@')[0])}
+                    disabled={!emailInvite || addContact.isPending}
+                    className="w-full bg-gradient-to-r from-blue-500 to-teal-500 hover:from-blue-600 hover:to-teal-600"
+                  >
+                    {addContact.isPending ? (
+                      <>
+                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
+                        Envoi en cours...
+                      </>
+                    ) : (
+                      <>
+                        <Send className="w-4 h-4 mr-2" />
+                        Envoyer l'invitation
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
       </div>
     </div>
   );
 };
 
-export default TeamManager;
+export default ContactsManager;

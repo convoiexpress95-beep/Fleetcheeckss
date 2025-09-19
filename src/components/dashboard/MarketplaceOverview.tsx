@@ -1,9 +1,10 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Link } from 'react-router-dom';
-import { Store, MapPin, Euro, ArrowRight, Plus } from 'lucide-react';
+import { Store, MapPin, Euro, ArrowRight, Plus, Loader2 } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
 
 interface MarketplaceMission {
   id: string;
@@ -15,28 +16,53 @@ interface MarketplaceMission {
   vehicule_requis?: string;
 }
 
-const mockMissions: MarketplaceMission[] = [
-  {
-    id: "1",
-    titre: "Transport véhicule Paris-Lyon",
-    ville_depart: "Paris",
-    ville_arrivee: "Lyon",
-    prix_propose: 850,
-    statut: "ouverte",
-    vehicule_requis: "Remorque"
-  },
-  {
-    id: "2", 
-    titre: "Convoyage Marseille-Bordeaux",
-    ville_depart: "Marseille",
-    ville_arrivee: "Bordeaux", 
-    prix_propose: 650,
-    statut: "en_negociation",
-    vehicule_requis: "Plateau"
-  }
-];
-
 export function MarketplaceOverview() {
+  const [missions, setMissions] = useState<MarketplaceMission[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    loadMissions();
+  }, []);
+
+  const loadMissions = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('marketplace_missions')
+        .select('*')
+        .eq('statut', 'ouverte')
+        .order('created_at', { ascending: false })
+        .limit(2);
+
+      if (error) throw error;
+      
+      setMissions(data || []);
+    } catch (error) {
+      console.error('Error loading marketplace missions:', error);
+      // Fallback avec données statiques en cas d'erreur
+      setMissions([
+        {
+          id: "fallback-1",
+          titre: "Transport véhicule Paris-Lyon",
+          ville_depart: "Paris",
+          ville_arrivee: "Lyon",
+          prix_propose: 850,
+          statut: "ouverte",
+          vehicule_requis: "Remorque"
+        },
+        {
+          id: "fallback-2", 
+          titre: "Convoyage Marseille-Bordeaux",
+          ville_depart: "Marseille",
+          ville_arrivee: "Bordeaux", 
+          prix_propose: 650,
+          statut: "en_negociation",
+          vehicule_requis: "Plateau"
+        }
+      ]);
+    } finally {
+      setLoading(false);
+    }
+  };
   return (
     <Card className="glass-card border-white/10 hover:scale-105 transition-all duration-500 group">
       <CardHeader>
@@ -63,7 +89,17 @@ export function MarketplaceOverview() {
         </div>
       </CardHeader>
       <CardContent className="space-y-3">
-        {mockMissions.slice(0, 2).map((mission) => (
+        {loading ? (
+          <div className="flex items-center justify-center py-8">
+            <Loader2 className="w-6 h-6 animate-spin text-foreground/60" />
+            <span className="ml-2 text-sm text-foreground/60">Chargement...</span>
+          </div>
+        ) : missions.length === 0 ? (
+          <div className="text-center py-8">
+            <p className="text-sm text-foreground/60">Aucune mission disponible</p>
+          </div>
+        ) : (
+          missions.slice(0, 2).map((mission) => (
           <div key={mission.id} className="p-3 rounded-lg bg-white/5 hover:bg-white/10 transition-colors">
             <div className="flex justify-between items-start mb-2">
               <h4 className="font-medium text-foreground text-sm">{mission.titre}</h4>
@@ -87,7 +123,7 @@ export function MarketplaceOverview() {
               </Badge>
             )}
           </div>
-        ))}
+        )))}
         
         <Button asChild className="w-full bg-gradient-ocean hover:scale-105 transition-all duration-300 mt-4">
           <Link to="/marketplace">

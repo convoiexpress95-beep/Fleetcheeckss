@@ -1,4 +1,5 @@
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { AvatarFallback } from "@/components/ui/avatar"; // Legacy fallback non utilisé après migration
+import UserAvatar from '@/components/UserAvatar';
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -70,12 +71,7 @@ export function TripCard({ trip, onReserve }: TripCardProps) {
         <div className="flex justify-between items-center">
           {/* Conducteur */}
           <div className="flex items-center gap-3">
-            <Avatar className="w-10 h-10 ring-2 ring-primary/20">
-              <AvatarImage src={trip.driver.avatar} />
-              <AvatarFallback className="bg-primary/10 text-primary font-medium">
-                {initials}
-              </AvatarFallback>
-            </Avatar>
+            <UserAvatar src={trip.driver.avatar} name={trip.driver.name} className="w-10 h-10 ring-2 ring-primary/20" />
             <div>
               <div className="flex items-center gap-2">
                 <span className="font-medium text-sm">{trip.driver.name}</span>

@@ -4,8 +4,8 @@ import { PublishMissionDialog } from '@/pages/fleetmarket/PublishMissionDialog';
 import { useFleetMarketMissions } from '@/hooks/useFleetMarketMissions';
 import { RefreshCw } from 'lucide-react';
 import { useState, useMemo } from 'react';
-import SearchBar from '@/market/components/SearchBar';
-import MissionCard from '@/market/components/MissionCard';
+import SearchBar from '@/market-embed/components/SearchBar';
+import MissionCard from '@/market-embed/components/MissionCard';
 
 export default function FleetMarketPage(){
   console.debug('[FleetMarket] mount, location should be /fleetmarket');

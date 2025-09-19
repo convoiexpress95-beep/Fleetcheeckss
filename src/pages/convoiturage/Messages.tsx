@@ -1,7 +1,8 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar"; // Conservé pour structure
+import UserAvatar from '@/components/UserAvatar';
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -56,6 +57,8 @@ const Messages = () => {
   // Load messages for selected conversation
   useEffect(()=>{
     if (!selectedConversation) { setMessages([]); return; }
+    const meta = import.meta as unknown as { env?: Record<string, string> };
+    const RTC_DEBUG = meta.env?.VITE_RTC_DEBUG === '1';
     let active = true;
     const load = async () => {
       const { data } = await supabase
@@ -75,6 +78,7 @@ const Messages = () => {
     const ch = supabase
       .channel(`rt:ride_messages:${selectedConversation}`)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'ride_messages', filter: `ride_id=eq.${selectedConversation}` }, (payload:{ new?: RideMessageRow })=>{
+        if (RTC_DEBUG) console.debug('[RTC][covoit] INSERT ride_messages payload:', payload);
         const m = payload.new;
         if(!m) return;
         setMessages(prev => [...prev, {
@@ -85,8 +89,9 @@ const Messages = () => {
           avatar: '/placeholder-avatar.jpg'
         }]);
       })
-      .subscribe();
-    return ()=>{ active = false; supabase.removeChannel(ch); };
+      .subscribe((status)=>{ if (RTC_DEBUG) console.debug('[RTC][covoit] channel status:', status); });
+    if (RTC_DEBUG) console.debug('[RTC][covoit] subscribing channel:', `rt:ride_messages:${selectedConversation}`);
+    return ()=>{ active = false; if (RTC_DEBUG) console.debug('[RTC][covoit] removing channel:', `rt:ride_messages:${selectedConversation}`); supabase.removeChannel(ch); };
   }, [selectedConversation, user?.id]);
 
   const selectedConv = conversations.find((c) => c.id === selectedConversation);
@@ -125,15 +130,7 @@ const Messages = () => {
                     >
                       <div className="flex items-start gap-3">
                         <div className="relative">
-                          <Avatar className="w-12 h-12">
-                            <AvatarImage src={conversation.participant.avatar} />
-                            <AvatarFallback>
-                              {conversation.participant.name
-                                .split(" ")
-                                .map((n) => n[0])
-                                .join("")}
-                            </AvatarFallback>
-                          </Avatar>
+                          <UserAvatar src={conversation.participant.avatar} name={conversation.participant.name} className="w-12 h-12" />
                           {conversation.participant.online && (
                             <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-500 border-2 border-background rounded-full"></div>
                           )}
@@ -182,15 +179,7 @@ const Messages = () => {
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
                       <div className="relative">
-                        <Avatar className="w-10 h-10">
-                          <AvatarImage src={selectedConv.participant.avatar} />
-                          <AvatarFallback>
-                            {selectedConv.participant.name
-                              .split(" ")
-                              .map((n) => n[0])
-                              .join("")}
-                          </AvatarFallback>
-                        </Avatar>
+                        <UserAvatar src={selectedConv.participant.avatar} name={selectedConv.participant.name} className="w-10 h-10" />
                       </div>
                       <div>
                         <h3 className="font-semibold">{selectedConv.participant.name}</h3>
@@ -220,10 +209,7 @@ const Messages = () => {
                   <div className="space-y-4">
                     {messages.map((message) => (
                       <div key={message.id} className={`flex items-start gap-3 ${message.sender === "me" ? "flex-row-reverse" : ""}`}>
-                        <Avatar className="w-8 h-8">
-                          <AvatarImage src={message.avatar} />
-                          <AvatarFallback>{message.sender === "me" ? "M" : "T"}</AvatarFallback>
-                        </Avatar>
+                        <UserAvatar src={message.avatar} name={message.sender === 'me' ? 'Moi' : selectedConv?.participant.name} className="w-8 h-8" />
 
                         <div className={`max-w-[70%] ${message.sender === "me" ? "text-right" : ""}`}>
                           <div className={`p-3 rounded-lg ${message.sender === "me" ? "bg-primary text-primary-foreground ml-auto" : "bg-muted"}`}>

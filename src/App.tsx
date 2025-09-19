@@ -4,11 +4,11 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
+import { RealtimeProvider } from "@/contexts/RealtimeContext";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { MobileLayout } from "@/components/MobileLayout";
 import Landing from "./pages/Landing";
-import NewLanding from "./landing/Landing";
 import Login from "./pages/Login";
 import Missions from "./pages/Missions";
 import EditMission from "./pages/EditMission";
@@ -29,6 +29,7 @@ import PostMarketplaceMission from "./pages/PostMarketplaceMission";
 import AcceptedMarketplaceMissions from "./pages/AcceptedMarketplaceMissions";
 import Settings from "./pages/Settings";
 import Admin from "./pages/Admin";
+import ProfileDiagnostic from "./pages/ProfileDiagnostic";
 import NewMission from "./pages/NewMission";
 import Catalog from "./pages/Catalog";
 import NotFound from "./pages/NotFound";
@@ -40,19 +41,21 @@ import ConvoiturageMessages from "./pages/convoiturage/Messages";
 import ConvoiturageProfile from "./pages/convoiturage/Profile";
 import ConvoiturageLayout from "./pages/convoiturage/Layout";
 import Dashboard from "./pages/Dashboard";
+import RealtimeTest from "./pages/RealtimeTest";
 
 const queryClient = new QueryClient();
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <AuthProvider>
-      <TooltipProvider>
-        <MobileLayout>
-          <Toaster />
-          <Sonner />
-          <BrowserRouter>
+      <RealtimeProvider>
+        <TooltipProvider>
+          <MobileLayout>
+            <Toaster />
+            <Sonner />
+            <BrowserRouter>
           <Routes>
-            <Route path="/" element={<NewLanding />} />
+            <Route path="/" element={<Landing />} />
             <Route path="/login" element={<Login />} />
             <Route path="/auth/login" element={<Login />} />
             <Route path="/public-tracking/:token" element={<PublicTracking />} />
@@ -236,11 +239,26 @@ const App = () => (
                 </DashboardLayout>
               </ProtectedRoute>
             } />
+            {/* Redirections legacy pour anciens liens du dashboard */}
+            <Route path="/my-offers" element={<Navigate to="/marketplace/my-offers" replace />} />
+            <Route path="/mission-history" element={<Navigate to="/marketplace/history" replace />} />
             <Route path="/trajets-partages" element={<Navigate to="/convoiturage" replace />} />
             <Route path="/settings" element={
               <ProtectedRoute>
                 <DashboardLayout>
                   <Settings />
+                </DashboardLayout>
+              </ProtectedRoute>
+            } />
+            <Route path="/profile-diagnostic" element={
+              <ProtectedRoute>
+                <ProfileDiagnostic />
+              </ProtectedRoute>
+            } />
+            <Route path="/realtime-test" element={
+              <ProtectedRoute>
+                <DashboardLayout>
+                  <RealtimeTest />
                 </DashboardLayout>
               </ProtectedRoute>
             } />
@@ -263,6 +281,7 @@ const App = () => (
           </BrowserRouter>
         </MobileLayout>
       </TooltipProvider>
+      </RealtimeProvider>
     </AuthProvider>
   </QueryClientProvider>
 );

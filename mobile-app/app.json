@@ -73,7 +73,8 @@
           "photosPermission": "Cette app accède à vos photos pour les rapports d'inspection.",
           "cameraPermission": "Cette app utilise l'appareil photo pour les états des lieux."
         }
-      ]
+      ],
+      "expo-font"
     ],
     "extra": {
       "eas": {

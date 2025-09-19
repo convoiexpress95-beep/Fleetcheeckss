@@ -4,17 +4,33 @@ import { MissionKPIs } from '@/components/missions/MissionKPIs';
 import { MissionFilters } from '@/components/missions/MissionFilters';
 import { MissionTable } from '@/components/missions/MissionTable';
 import { MissionCreateDrawer } from '@/components/missions/MissionCreateDrawer';
-import { useMissionStore } from '@/hooks/useMissionStore';
+import { useMissionSupabase, SupabaseMission } from '@/hooks/useMissionSupabase';
 import { useEffect, useState, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { ALLOW_STATUS_CHANGE } from '@/lib/mission-policy';
+import { Loader2 } from 'lucide-react';
 
 const MissionsPage = () => {
-  const { viewMode, setViewMode, filtered, pageItems, pageCount, page, setPage, addMission, filters, setFilters, updateMissionStatus, removeMission, sort, toggleSort } = useMissionStore();
-  const [loading, setLoading] = useState(true); // simulé
+  const { 
+    viewMode, 
+    setViewMode, 
+    filtered, 
+    pageItems, 
+    pageCount, 
+    page, 
+    setPage, 
+    addMission, 
+    filters, 
+    setFilters, 
+    updateMissionStatus, 
+    removeMission, 
+    sort, 
+    toggleSort,
+    loading,
+    missions
+  } = useMissionSupabase();
+  
   const [search] = useSearchParams();
   const [open, setOpen] = useState(false);
-  // Wizard avancé supprimé
   const [compact, setCompact] = useState(false);
   
   // Détecter les paramètres URL pour pré-remplir le formulaire avec un contact assigné
@@ -44,30 +60,58 @@ const MissionsPage = () => {
   // Sync viewMode with URL parameter on mount
   // (Vue kanban supprimée)
   const items = viewMode==='list'? pageItems : filtered;
-  useEffect(()=>{ const t = setTimeout(()=> setLoading(false), 600); return ()=> clearTimeout(t); },[]);
+  // useEffect for loading removed - now handled by useMissionSupabase
   const exportCsv = () => {
     if(!filtered.length) return;
-    const headers = ['ID','Client','Véhicule','Départ','Arrivée','Statut','Date départ'];
-    const rows = filtered.map(m => [m.id, m.client.name, `${m.vehicle.brand} ${m.vehicle.model}`, m.departure.address.city, m.arrival.address.city, m.status, new Date(m.departure.date).toLocaleDateString('fr-FR')]);
+    const headers = ['ID','Titre','Véhicule','Départ','Arrivée','Statut','Date départ'];
+    const rows = filtered.map(m => [m.id, m.titre || 'N/A', m.vehicule_requis || 'N/A', m.ville_depart, m.ville_arrivee, m.statut, new Date(m.date_depart).toLocaleDateString('fr-FR')]);
     const csv = [headers, ...rows].map(r=> r.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n');
     const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
     const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `missions_${new Date().toISOString().slice(0,10)}.csv`; a.click();
   };
-  // Garde basique si hook store casse (évite écran blanc total)
-  if(!Array.isArray(filtered)) {
-    return <div className="p-6 text-sm text-red-400">Store missions indisponible</div>;
-  }
+  // Mappe le statut UI vers le statut Supabase
+  const handleStatusChange = (id: string, status: 'En attente'|'En cours'|'En retard'|'Livrée'|'Annulée') => {
+    // Conversion des anciens statuts vers les nouveaux
+    const statusMap: { [key: string]: string } = {
+      'En attente': 'ouverte',
+      'En cours': 'en_negociation', // 'En cours' peut être en_negociation ou attribuee
+      'En retard': 'en_negociation',
+      'Livrée': 'terminee',
+      'Annulée': 'annulee'
+    };
+    const supabaseStatus = statusMap[status] || 'ouverte';
+    updateMissionStatus(id, supabaseStatus as any);
+  };
+
+  // Plus d'adaptateur: les composants consomment désormais SupabaseMission directement
+
+  // Plus de conversion locale: le drawer fournit désormais directement InsertSupabaseMission
 
   return (
     <ErrorBoundary>
     <div className={`p-6 max-w-7xl mx-auto ${compact?'density-compact':''}`}>
   <MissionHeader compact={compact} onToggleCompact={()=>setCompact(c=>!c)} count={filtered.length} viewMode={'list'} onToggleView={()=>{}} onCreate={()=>{ setOpen(true); }} />
   {/* Bouton de bascule wizard retiré */}
-      <MissionKPIs missions={filtered} activeFilters={filters.status} onQuickFilter={(payload)=>{
-        if(payload==='ALL') setFilters(f=>({...f, status:[]}));
-        else setFilters(f=>({...f, status:payload}));
-      }} />
-      <MissionFilters filters={filters} onChange={setFilters} />
+            {(() => {
+              const activeUi: Array<'En attente'|'En cours'|'Livrée'|'Annulée'|'En retard'> = (filters.status || []).map(s => s==='terminee' ? 'Livrée' : s==='annulee' ? 'Annulée' : s==='en_negociation' || s==='attribuee' ? 'En cours' : 'En attente');
+              return (
+            <MissionKPIs 
+              missions={filtered as SupabaseMission[]} 
+              activeFilters={activeUi} 
+              onQuickFilter={(payload: any)=>{
+                if (payload === 'ALL') {
+                  setFilters({ ...filters, status: [] });
+                } else {
+                  // Map UI → supabase
+                  const mapped = (payload as string[]).map(s => 
+                    s==='Livrée' ? 'terminee' : s==='Annulée' ? 'annulee' : s==='En cours' ? 'en_negociation' : 'ouverte'
+                  );
+                  setFilters({ ...filters, status: mapped });
+                }
+              }} 
+            />);
+            })()}
+  <MissionFilters filters={filters} onChange={setFilters} />
 
       {loading && (
         <div className="mt-4 space-y-4" aria-label="Chargement des missions">
@@ -89,7 +133,15 @@ const MissionsPage = () => {
       )}
 
       {!loading && (
-        <MissionTable missions={items} onStatusChange={ALLOW_STATUS_CHANGE? (id,s)=>updateMissionStatus(id,s) : undefined} onExportCsv={exportCsv} onRemove={id=>removeMission(id)} sortField={sort.field} sortDir={sort.dir} onToggleSort={(f)=>toggleSort(f as any)} />
+        <MissionTable 
+          missions={pageItems as SupabaseMission[]} 
+          onStatusChange={handleStatusChange} 
+          onExportCsv={exportCsv} 
+          onRemove={id => removeMission(id)} 
+          sortField={sort.field} 
+          sortDir={sort.dir} 
+          onToggleSort={toggleSort} 
+        />
       )}
 
       {!loading && !items.length && (
@@ -117,7 +169,7 @@ const MissionsPage = () => {
   <MissionCreateDrawer 
     open={open} 
     onClose={() => setOpen(false)} 
-    onCreate={(m) => addMission(m)}
+    onCreate={addMission}
     preAssignedContact={preAssignedContact}
   />
     </div>

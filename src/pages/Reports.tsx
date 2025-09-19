@@ -17,24 +17,41 @@ interface MissionRow {
 }
 
 async function fetchCompletedMissions(): Promise<MissionRow[]> {
+  // Diagnostic: essayons d'abord de récupérer une seule mission pour voir sa structure
+  const { data: testData, error: testError } = await supabase
+    .from('missions')
+    .select('*')
+    .limit(1);
+  
+  if (testError) {
+    console.error('Test error:', testError);
+  } else {
+    console.log('Mission table structure sample:', testData?.[0]);
+  }
+
   const { data, error } = await supabase
     .from('missions')
     .select('id, title, reference, pickup_address, delivery_address, created_at')
-    .eq('status', 'completed')
+    // .eq('status', 'completed') // Temporairement commenté pour tester la structure
     .order('updated_at', { ascending: false })
     .limit(100);
-  if (error) throw error;
+  if (error) {
+    console.error('Error fetching missions:', error);
+    throw error;
+  }
   return (data || []) as MissionRow[];
 }
 
 // Helpers (pure)
-const normalizeKey = (baseUrl: string, path?: string | null): string | null => {
+const normalizeKey = (path?: string | null): string | null => {
   if (!path) return null;
   if (/^https?:\/\//i.test(path)) return path; // déjà une URL
+  // Nettoyer d'éventuels préfixes absolus (quel que soit le domaine)
   let key = path.replace(/^\/+/, '');
-  const pubPrefix = `/storage/v1/object/public/mission-photos/`;
-  const fullPrefix = `${baseUrl}${pubPrefix}`;
-  if (key.startsWith(fullPrefix)) key = key.slice(fullPrefix.length);
+  // Supprime le domaine s'il est présent, en ne gardant que le chemin
+  key = key.replace(/^https?:\/\/[^/]+\//i, '');
+  // Supprime le chemin public supabase si présent
+  const pubPrefix = 'storage/v1/object/public/mission-photos/';
   if (key.startsWith(pubPrefix)) key = key.slice(pubPrefix.length);
   if (key.startsWith('mission-photos/')) key = key.slice('mission-photos/'.length);
   return key;
@@ -106,15 +123,14 @@ const Reports = () => {
     })();
   }, []);
 
-  const baseUrl = (import.meta as unknown as { env?: Record<string, string> })?.env?.VITE_SUPABASE_URL || 'https://lucpsjwaglmiejpfxofe.supabase.co';
   const publicUrlFor = useCallback((path?: string | null) => {
     if (!path) return null;
     if (/^https?:\/\//i.test(path)) return path;
-    const key = normalizeKey(baseUrl, path);
+    const key = normalizeKey(path);
     if (!key) return null;
     const { data } = supabase.storage.from('mission-photos').getPublicUrl(key);
-    return data.publicUrl || `${baseUrl}/storage/v1/object/public/mission-photos/${key}`;
-  }, [baseUrl]);
+    return data.publicUrl || null;
+  }, []);
 
   const loadMissionDetails = async (m: MissionRow) => {
     setViewLoading(true);
@@ -166,7 +182,9 @@ const Reports = () => {
       const arrPhotos = Array.isArray(arr?.photos) ? (arr?.photos as unknown as string[]) : [];
       const all = [...depPhotos, ...arrPhotos];
       const links = all.map((p, i) => `Photo ${i + 1}: ${publicUrlFor(p)}`).join('\n');
-      const fnUrl = `${baseUrl}/functions/v1/zip-mission-photos?missionId=${encodeURIComponent(m.id)}`;
+  // Construit l'URL de la fonction à partir de l'URL du projet courant du client
+  const projectUrl = (supabase as any).rest?.url?.replace(/\/rest\/v1\/?$/, '') || (import.meta as any)?.env?.VITE_SUPABASE_URL || '';
+  const fnUrl = projectUrl ? `${projectUrl}/functions/v1/zip-mission-photos?missionId=${encodeURIComponent(m.id)}` : '';
       const subject = encodeURIComponent(`Rapport de mission ${m.reference}`);
       const body = encodeURIComponent(`Bonjour,\n\nRapport: ${m.reference} – ${m.title}\nPDF (bundle photos): ${fnUrl}\n\nLiens photos:\n${links}\n\nCordialement`);
       window.location.href = `mailto:?subject=${subject}&body=${body}`;
@@ -180,7 +198,8 @@ const Reports = () => {
     try {
       const session = (await supabase.auth.getSession()).data.session;
       const token = session?.access_token;
-      const fnUrl = `${baseUrl}/functions/v1/zip-mission-photos?missionId=${encodeURIComponent(m.id)}`;
+  const projectUrl = (supabase as any).rest?.url?.replace(/\/rest\/v1\/?$/, '') || (import.meta as any)?.env?.VITE_SUPABASE_URL || '';
+  const fnUrl = projectUrl ? `${projectUrl}/functions/v1/zip-mission-photos?missionId=${encodeURIComponent(m.id)}` : '';
       const res = await fetch(fnUrl, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
       if (!res.ok) {
         window.open(fnUrl, '_blank');
@@ -220,7 +239,7 @@ const Reports = () => {
   };
 
   const openPhoto = async (path: string) => {
-    const key = normalizeKey(baseUrl, path);
+    const key = normalizeKey(path);
     const url = publicUrlFor(key) || publicUrlFor(path) || '#';
     window.open(url, '_blank');
   };

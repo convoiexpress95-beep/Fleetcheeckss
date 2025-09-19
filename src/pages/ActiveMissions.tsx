@@ -12,6 +12,8 @@ import {
   TrendingUp, Play, Pause, Square, RefreshCw, Sparkles
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import { useCreateMission, useUpdateMission } from "@/hooks/useMissions";
+import { useToast } from "@/hooks";
 
 interface ActiveMission {
   id: string;
@@ -69,12 +71,18 @@ interface ActiveMission {
   startedAt?: string;
   expectedDuration: string;
   actualDuration?: string;
+  // Lien optionnel avec une mission réelle créée dans la table public.missions
+  missionId?: string;
 }
 
 const ActiveMissions = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [missions, setMissions] = useState<ActiveMission[]>([]);
+  const createMission = useCreateMission();
+  const updateMission = useUpdateMission();
+  const { toast } = useToast();
+  const [startingId, setStartingId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("all");
 
@@ -323,24 +331,70 @@ const ActiveMissions = () => {
 
   const counts = getTabCounts();
 
-  const handleStartMission = (missionId: string) => {
-    setMissions(prev =>
-      prev.map(mission =>
-        mission.id === missionId
-          ? { ...mission, status: "en_route" as const, startedAt: new Date().toISOString(), progress: 5 }
-          : mission
-      )
-    );
+  const handleStartMission = async (localId: string) => {
+    try {
+      setStartingId(localId);
+      const m = missions.find(x => x.id === localId);
+      if (!m) return;
+      if (!user?.id) {
+        toast({ title: "Non connecté", description: "Veuillez vous connecter pour démarrer.", variant: "destructive" });
+        return;
+      }
+      // Si déjà liée à une mission, on saute la création
+      let createdId = m.missionId;
+      if (!createdId) {
+        const payload: any = {
+          title: m.title,
+          pickup_address: `${m.departure.address} (${m.departure.city})`,
+          delivery_address: `${m.arrival.address} (${m.arrival.city})`,
+          pickup_date: new Date(`${m.schedule.departureDate}T${m.schedule.departureTime}`).toISOString(),
+          delivery_date: new Date(`${m.schedule.arrivalDate}T${m.schedule.arrivalTime}`).toISOString(),
+          license_plate: m.vehicle.plate,
+          vehicle_brand: m.vehicle.brand,
+          vehicle_model_name: m.vehicle.model,
+          vehicle_body_type: 'autre',
+          donor_earning: m.financial.agreedPrice,
+          driver_earning: Math.max(0, m.financial.agreedPrice - (m.financial.expenses || 0)),
+          driver_id: user.id,
+          description: `Mission générée depuis Missions Actives (${m.urgency})`
+        };
+        const created = await createMission.mutateAsync(payload);
+        createdId = created?.id as string;
+      }
+      // Met à jour le statut côté DB
+      if (createdId) {
+        updateMission.mutate({ id: createdId, updates: { status: 'in_progress', driver_id: user.id } });
+      }
+      // Met à jour l'état local
+      setMissions(prev => prev.map(m => m.id === localId ? {
+        ...m,
+        missionId: createdId,
+        status: "en_route" as const,
+        startedAt: new Date().toISOString(),
+        progress: Math.max(m.progress, 5)
+      } : m));
+    } catch (e: any) {
+      const msg = (e?.message || String(e)) as string;
+      const isCredit = /crédit|credit|consume_credit|insuffisant/i.test(msg);
+      toast({
+        title: isCredit ? "Crédits insuffisants" : "Impossible de démarrer",
+        description: isCredit ? "Rechargez vos crédits pour créer et démarrer une mission." : msg,
+        variant: "destructive"
+      });
+    }
+    finally {
+      setStartingId(null);
+    }
   };
 
-  const handleCompleteMission = (missionId: string) => {
-    setMissions(prev =>
-      prev.map(mission =>
-        mission.id === missionId
-          ? { ...mission, status: "delivered" as const, progress: 100 }
-          : mission
-      )
-    );
+  const handleCompleteMission = (localId: string) => {
+    const m = missions.find(x => x.id === localId);
+    if (m?.missionId) {
+      updateMission.mutate({ id: m.missionId, updates: { status: 'completed' } });
+    } else {
+      toast({ title: "Mission non liée", description: "Aucune mission synchronisée à clôturer.", variant: "destructive" });
+    }
+    setMissions(prev => prev.map(x => x.id === localId ? { ...x, status: 'delivered' as const, progress: 100 } : x));
   };
 
   if (loading) {
@@ -653,10 +707,11 @@ const ActiveMissions = () => {
                           <Button
                             size="sm"
                             onClick={() => handleStartMission(mission.id)}
+                            disabled={startingId === mission.id || createMission.isPending}
                             className="bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600"
                           >
                             <Play className="w-4 h-4 mr-1" />
-                            Démarrer
+                            {startingId === mission.id || createMission.isPending ? 'Démarrage…' : 'Démarrer'}
                           </Button>
                         )}
                         

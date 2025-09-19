@@ -1,8 +1,9 @@
-import { Mission, MissionStatus } from '@/lib/mission-types';
+import type { SupabaseMission } from '@/hooks/useMissionSupabase';
+type MissionStatus = 'En attente'|'En cours'|'Livrée'|'Annulée'|'En retard';
 import { useMemo } from 'react';
 import { getMissionStatusStyle } from '@/lib/mission-status-colors';
 
-interface Props { missions: Mission[]; activeFilters: MissionStatus[]; onQuickFilter: (single: MissionStatus[] | 'ALL')=>void }
+interface Props { missions: SupabaseMission[]; activeFilters: MissionStatus[]; onQuickFilter: (single: MissionStatus[] | 'ALL')=>void }
 
 // Ordre sans 'En retard' (retiré à la demande)
 const ORDER: MissionStatus[] = ['En attente','En cours','Livrée','Annulée'];
@@ -10,7 +11,12 @@ const ORDER: MissionStatus[] = ['En attente','En cours','Livrée','Annulée'];
 export const MissionKPIs: React.FC<Props> = ({ missions, activeFilters, onQuickFilter }) => {
   const counts = useMemo(()=>{
     const map: Record<string, number> = { ALL: missions.length };
-    ORDER.forEach(s=> map[s]= missions.filter(m=>m.status===s).length);
+    ORDER.forEach(s=> {
+      map[s] = missions.filter(m => {
+        const ui: MissionStatus = m.statut==='terminee' ? 'Livrée' : m.statut==='annulee' ? 'Annulée' : (m.statut==='attribuee' || m.statut==='en_negociation') ? 'En cours' : 'En attente';
+        return ui === s;
+      }).length;
+    });
     return map;
   },[missions]);
   const isAll = activeFilters.length===0;

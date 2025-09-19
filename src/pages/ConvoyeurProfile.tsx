@@ -4,7 +4,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { AvatarFallback } from "@/components/ui/avatar"; // autres avatars remplacés par UserAvatar
+import UserAvatar from '@/components/UserAvatar';
 import { 
   User, Star, MapPin, Calendar, Car, Phone, Mail, 
   Award, Shield, TrendingUp, Clock, CheckCircle, 
@@ -290,12 +291,7 @@ const ConvoyeurProfile = () => {
             {/* Profil principal */}
             <Card className="bg-gray-800/30 backdrop-blur-lg border-gray-700/50">
               <CardContent className="p-6 text-center">
-                <Avatar className="w-24 h-24 mx-auto mb-4">
-                  <AvatarImage src={profile.avatar} />
-                  <AvatarFallback className="bg-gradient-to-r from-cyan-500 to-teal-500 text-white text-2xl font-bold">
-                    {profile.name.split(' ').map(n => n[0]).join('')}
-                  </AvatarFallback>
-                </Avatar>
+                <UserAvatar src={profile.avatar} name={profile.name} className="w-24 h-24 mx-auto mb-4" />
                 
                 <h2 className="text-2xl font-bold text-white mb-2">{profile.name}</h2>
                 
