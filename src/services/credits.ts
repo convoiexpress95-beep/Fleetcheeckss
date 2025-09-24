@@ -1,10 +1,4 @@
 import { supabase } from '@/integrations/supabase/client';
-import type { Database } from '@/integrations/supabase/types.extended';
-
-// NOTE: utilise désormais les types étendus (types.extended.ts) incluant credits_* & trajet_join_requests
-
-type CreditsWalletRow = Database['public']['Tables']['credits_wallets']['Row'];
-type CreditsLedgerInsert = Database['public']['Tables']['credits_ledger']['Insert'];
 
 // Débite un nombre de crédits (amount positif => débit) du wallet utilisateur et écrit une ligne ledger.
 // Retourne le nouveau solde.
@@ -27,11 +21,10 @@ export async function debitCredits(params: { userId: string; amount: number; rea
   if (upErr) throw upErr;
   const { error: ledErr } = await supabase.from('credits_ledger').insert({
     user_id: userId,
-    amount: -amount,
+    delta: -amount,
     reason,
-    ref_type: refType || null,
-    ref_id: refId || null,
-  } as CreditsLedgerInsert);
+    ref: refType && refId ? `${refType}:${refId}` : null,
+  });
   if (ledErr) throw ledErr;
   return newBalance;
 }
@@ -84,11 +77,10 @@ export async function creditCredits(params: { userId: string; amount: number; re
   if (upErr) throw upErr;
   const { error: ledErr } = await supabase.from('credits_ledger').insert({
     user_id: userId,
-    amount: amount,
+    delta: amount,
     reason,
-    ref_type: refType || null,
-    ref_id: refId || null,
-  } as CreditsLedgerInsert);
+    ref: refType && refId ? `${refType}:${refId}` : null,
+  });
   if (ledErr) throw ledErr;
   return newBalance;
 }

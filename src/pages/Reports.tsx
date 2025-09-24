@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useCallback } from 'react';
-import { FileText, Download, Mail, Eye, Search, MapPin, RefreshCw, X } from 'lucide-react';
+import { FileText, Mail, Eye, Search, MapPin, RefreshCw, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -14,9 +14,10 @@ interface MissionRow {
   pickup_address?: string | null;
   delivery_address?: string | null;
   created_at: string;
+  archived?: boolean | null;
 }
 
-async function fetchCompletedMissions(): Promise<MissionRow[]> {
+async function fetchCompletedMissions(showArchived = false): Promise<MissionRow[]> {
   // Diagnostic: essayons d'abord de récupérer une seule mission pour voir sa structure
   const { data: testData, error: testError } = await supabase
     .from('missions')
@@ -31,15 +32,26 @@ async function fetchCompletedMissions(): Promise<MissionRow[]> {
 
   const { data, error } = await supabase
     .from('missions')
-    .select('id, title, reference, pickup_address, delivery_address, created_at')
-    // .eq('status', 'completed') // Temporairement commenté pour tester la structure
+    .select('*')
+    .eq('status', 'completed')
     .order('updated_at', { ascending: false })
     .limit(100);
   if (error) {
     console.error('Error fetching missions:', error);
     throw error;
   }
-  return (data || []) as MissionRow[];
+  const list = (data || []) as any[];
+  return list
+    .filter(m => Boolean(m.archived) === Boolean(showArchived))
+    .map(m => ({
+      id: m.id,
+      title: m.title,
+      reference: m.reference,
+      pickup_address: m.pickup_address,
+      delivery_address: m.delivery_address,
+      created_at: m.created_at,
+      archived: m.archived ?? false,
+    })) as MissionRow[];
 }
 
 // Helpers (pure)
@@ -61,6 +73,11 @@ interface InspectionDeparture {
   photos?: unknown;
   initial_mileage?: number | string | null;
   initial_fuel?: number | string | null;
+  fuel_percent?: number | null;
+  keys_count?: number | null;
+  has_fuel_card?: boolean | null;
+  has_board_documents?: boolean | null;
+  has_delivery_report?: boolean | null;
   client_email?: string | null;
   internal_notes?: string | null;
   client_signature_data?: string;
@@ -98,6 +115,7 @@ const Reports = () => {
   const [loading, setLoading] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [query, setQuery] = useState('');
+  const [showArchived, setShowArchived] = useState(false);
 
   // État pour le modal "Rapport complet" (cohérent avec mobile)
   const [viewing, setViewing] = useState<MissionRow | null>(null);
@@ -113,7 +131,7 @@ const Reports = () => {
     (async () => {
       setLoading(true);
       try {
-        const m = await fetchCompletedMissions();
+        const m = await fetchCompletedMissions(showArchived);
         setMissions(m);
       } catch (e) {
         console.error(e);
@@ -121,7 +139,7 @@ const Reports = () => {
         setLoading(false);
       }
     })();
-  }, []);
+  }, [showArchived]);
 
   const publicUrlFor = useCallback((path?: string | null) => {
     if (!path) return null;
@@ -181,13 +199,43 @@ const Reports = () => {
       const depPhotos = Array.isArray(dep?.photos) ? (dep?.photos as unknown as string[]) : [];
       const arrPhotos = Array.isArray(arr?.photos) ? (arr?.photos as unknown as string[]) : [];
       const all = [...depPhotos, ...arrPhotos];
-      const links = all.map((p, i) => `Photo ${i + 1}: ${publicUrlFor(p)}`).join('\n');
+      // Build PNG links via Edge Function for consistent downloads
+      const projectUrl = (supabase as any).rest?.url?.replace(/\/rest\/v1\/?$/, '') || (import.meta as any)?.env?.VITE_SUPABASE_URL || '';
+      const links = all.map((p, i) => {
+        let key = normalizeKey(p);
+        const href = projectUrl && key ? `${projectUrl}/functions/v1/photo-png?path=${encodeURIComponent(key)}` : (publicUrlFor(p) || '#');
+        return `Photo ${i + 1}: ${href}`;
+      }).join('\n');
   // Construit l'URL de la fonction à partir de l'URL du projet courant du client
-  const projectUrl = (supabase as any).rest?.url?.replace(/\/rest\/v1\/?$/, '') || (import.meta as any)?.env?.VITE_SUPABASE_URL || '';
   const fnUrl = projectUrl ? `${projectUrl}/functions/v1/zip-mission-photos?missionId=${encodeURIComponent(m.id)}` : '';
       const subject = encodeURIComponent(`Rapport de mission ${m.reference}`);
       const body = encodeURIComponent(`Bonjour,\n\nRapport: ${m.reference} – ${m.title}\nPDF (bundle photos): ${fnUrl}\n\nLiens photos:\n${links}\n\nCordialement`);
       window.location.href = `mailto:?subject=${subject}&body=${body}`;
+    } finally { setBusyId(null); }
+  };
+
+  const emailFullReportGmail = async (m: MissionRow) => {
+    setBusyId(m.id);
+    try {
+      const [{ data: dep }, { data: arr }] = await Promise.all([
+        supabase.from('inspection_departures').select('photos').eq('mission_id', m.id).maybeSingle(),
+        supabase.from('inspection_arrivals').select('photos').eq('mission_id', m.id).maybeSingle(),
+      ]);
+      const depPhotos = Array.isArray(dep?.photos) ? (dep?.photos as unknown as string[]) : [];
+      const arrPhotos = Array.isArray(arr?.photos) ? (arr?.photos as unknown as string[]) : [];
+      const all = [...depPhotos, ...arrPhotos];
+      const projectUrl = (supabase as any).rest?.url?.replace(/\/rest\/v1\/?$/, '') || (import.meta as any)?.env?.VITE_SUPABASE_URL || '';
+      const links = all.map((p, i) => {
+        let key = normalizeKey(p);
+        const href = projectUrl && key ? `${projectUrl}/functions/v1/photo-png?path=${encodeURIComponent(key)}` : (publicUrlFor(p) || '#');
+        return `Photo ${i + 1}: ${href}`;
+      }).join('%0A');
+      const fnUrl = projectUrl ? `${projectUrl}/functions/v1/zip-mission-photos?missionId=${encodeURIComponent(m.id)}` : '';
+      const subject = encodeURIComponent(`Rapport de mission ${m.reference}`);
+      const bodyPrefix = encodeURIComponent(`Bonjour,\n\nRapport: ${m.reference} – ${m.title}\nPDF (bundle photos): ${fnUrl}\n\nLiens photos:\n`);
+      const bodySuffix = encodeURIComponent(`\n\nCordialement`);
+      const gmailUrl = `https://mail.google.com/mail/?view=cm&fs=1&su=${subject}&body=${bodyPrefix}${links}${bodySuffix}`;
+      window.open(gmailUrl, '_blank');
     } finally { setBusyId(null); }
   };
 
@@ -231,17 +279,28 @@ const Reports = () => {
   const refresh = async () => {
     setLoading(true);
     try {
-      const m = await fetchCompletedMissions();
+      const m = await fetchCompletedMissions(showArchived);
       setMissions(m);
     } finally {
       setLoading(false);
     }
   };
 
+  const toggleArchive = async (m: MissionRow, value: boolean) => {
+    setBusyId(m.id);
+    try {
+  const { error } = await supabase.from('missions').update({ archived: value } as any).eq('id', m.id);
+      if (error) throw error;
+      await refresh();
+    } finally { setBusyId(null); }
+  };
+
   const openPhoto = async (path: string) => {
     const key = normalizeKey(path);
-    const url = publicUrlFor(key) || publicUrlFor(path) || '#';
-    window.open(url, '_blank');
+    // Build photo-png link for best UX in mail/web
+    const base = (supabase as any).rest?.url?.replace(/\/rest\/v1\/?$/, '') || '';
+    const pngUrl = base ? `${base}/functions/v1/photo-png?path=${encodeURIComponent(key || path)}` : (publicUrlFor(key) || publicUrlFor(path) || '#');
+    window.open(pngUrl, '_blank');
   };
 
   // Petits composants internes pour supprimer duplication
@@ -281,7 +340,7 @@ const Reports = () => {
           </div>
           <div>
             <h1 className="text-3xl font-bold bg-gradient-royal bg-clip-text text-transparent drop-shadow">Rapports</h1>
-            <p className="text-muted-foreground">Missions terminées et export de rapports</p>
+            <p className="text-muted-foreground">Missions terminées et rapports</p>
           </div>
         </div>
 
@@ -301,6 +360,9 @@ const Reports = () => {
               <div className="flex items-center gap-2">
                 <Button variant="secondary" onClick={refresh} disabled={loading}>
                   <RefreshCw className="w-4 h-4 mr-1" /> Rafraîchir
+                </Button>
+                <Button variant={showArchived? 'default':'outline'} onClick={() => setShowArchived(s=>!s)}>
+                  {showArchived ? 'Voir actifs' : 'Voir archivés'}
                 </Button>
                 <Button onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })} variant="outline">
                   Haut de page
@@ -349,12 +411,19 @@ const Reports = () => {
                       <Button size="sm" variant="default" className="bg-cyan-600 hover:bg-cyan-700" onClick={() => openFullReport(m)} disabled={busyId===m.id}>
                         <Eye className="w-4 h-4 mr-1" /> Voir
                       </Button>
-                      <Button size="sm" variant="secondary" className="bg-teal-600 text-white hover:bg-teal-700" onClick={() => emailFullReport(m)} disabled={busyId===m.id}>
-                        <Mail className="w-4 h-4 mr-1" /> Email
-                      </Button>
-                      <Button size="sm" className="bg-cyan-600 hover:bg-cyan-700" onClick={() => downloadZip(m)} disabled={busyId===m.id} title="Télécharger toutes les photos (PDF)">
-                        <Download className="w-4 h-4 mr-1" /> Tout (PDF)
-                      </Button>
+                      <div className="flex items-center gap-2">
+                        <Button size="sm" variant="secondary" className="bg-teal-600 text-white hover:bg-teal-700" onClick={() => emailFullReport(m)} disabled={busyId===m.id}>
+                          <Mail className="w-4 h-4 mr-1" /> Email
+                        </Button>
+                        <Button size="sm" variant="outline" onClick={() => emailFullReportGmail(m)} disabled={busyId===m.id} title="Ouvrir Gmail">
+                          Gmail
+                        </Button>
+                      </div>
+                      {m.archived ? (
+                        <Button size="sm" variant="outline" onClick={() => toggleArchive(m, false)} disabled={busyId===m.id}>Désarchiver</Button>
+                      ) : (
+                        <Button size="sm" variant="outline" onClick={() => toggleArchive(m, true)} disabled={busyId===m.id}>Archiver</Button>
+                      )}
                     </div>
                   </div>
                 ))}
@@ -392,6 +461,11 @@ const Reports = () => {
                     <tbody>
                       <tr><th className="text-left align-top pr-2">Kilométrage</th><td className="text-muted-foreground">{depDetails?.initial_mileage ?? '-'}</td></tr>
                       <tr><th className="text-left align-top pr-2">Carburant</th><td className="text-muted-foreground">{depDetails?.initial_fuel ?? '-'}</td></tr>
+                      <tr><th className="text-left align-top pr-2">% Carburant</th><td className="text-muted-foreground">{depDetails?.fuel_percent ?? '-'}</td></tr>
+                      <tr><th className="text-left align-top pr-2">Clés</th><td className="text-muted-foreground">{depDetails?.keys_count != null ? (depDetails?.keys_count === 2 ? '2+' : String(depDetails?.keys_count)) : '-'}</td></tr>
+                      <tr><th className="text-left align-top pr-2">Carte carburant</th><td className="text-muted-foreground">{depDetails?.has_fuel_card ? 'Oui' : 'Non'}</td></tr>
+                      <tr><th className="text-left align-top pr-2">Docs de bord</th><td className="text-muted-foreground">{depDetails?.has_board_documents ? 'Oui' : 'Non'}</td></tr>
+                      <tr><th className="text-left align-top pr-2">PV de livraison</th><td className="text-muted-foreground">{depDetails?.has_delivery_report ? 'Oui' : 'Non'}</td></tr>
                       <tr><th className="text-left align-top pr-2">Email client</th><td className="text-muted-foreground">{depDetails?.client_email ?? '-'}</td></tr>
                       <tr><th className="text-left align-top pr-2">Notes internes</th><td className="text-muted-foreground">{depDetails?.internal_notes ?? '-'}</td></tr>
                     </tbody>

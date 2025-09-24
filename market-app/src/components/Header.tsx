@@ -11,7 +11,7 @@ import PublishMissionDialog from "@/components/PublishMissionDialog";
 
 const Header = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const { user, signOut } = useAuth();
+  const { user, signOut, profile } = useAuth() as any;
   const { toast } = useToast();
   const location = useLocation();
   const { counts, clearMessageNotifications, clearMissionNotifications } = useNotifications();
@@ -33,6 +33,7 @@ const Header = () => {
   };
 
   const userType = user?.user_metadata?.user_type || 'convoyeur';
+  const isAdmin = (profile?.app_role === 'admin') || (user?.user_metadata?.app_role === 'admin');
   return (
     <header className="w-full bg-card shadow-card border-b border-border">
       <div className="container mx-auto px-6 py-4">
@@ -104,6 +105,7 @@ const Header = () => {
             
             {/* Publier une mission */}
             <div className="ml-4">
+              {/* On laisse onCreated facultatif; si on est sur /, le composant Index passera une prop */}
               <PublishMissionDialog />
             </div>
           </nav>
@@ -129,9 +131,14 @@ const Header = () => {
                   <p className="font-medium text-foreground">
                     {user?.user_metadata?.full_name || user?.email || 'Utilisateur'}
                   </p>
-                  <Badge variant="secondary" className="text-xs">
-                    {userType === 'convoyeur' ? 'Convoyeur' : 'Donneur d\'ordre'}
-                  </Badge>
+                  <div className="flex items-center gap-2">
+                    <Badge variant="secondary" className="text-xs">
+                      {userType === 'convoyeur' ? 'Convoyeur' : 'Donneur d\'ordre'}
+                    </Badge>
+                    {isAdmin && (
+                      <Badge className="text-xs bg-amber-500 text-white hover:bg-amber-600">Admin</Badge>
+                    )}
+                  </div>
                 </div>
               </div>
               

@@ -14,6 +14,8 @@ import {
   Image,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
+import { supabase } from '../config/supabase';
+import { useAuth } from '../contexts/AuthContext';
 
 interface UserProfile {
   id: string;
@@ -42,23 +44,25 @@ interface UserSettings {
 }
 
 const ProfileScreen = () => {
+  const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<'profile' | 'security' | 'notifications' | 'preferences'>('profile');
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [loading, setLoading] = useState(false);
 
   // État du profil utilisateur
   const [profile, setProfile] = useState<UserProfile>({
-    id: '1',
-    user_id: 'user-123',
-    full_name: 'Pierre Martin',
-    email: 'pierre.martin@fleetchecks.fr',
-    phone: '+33 6 12 34 56 78',
-    bio: 'Gestionnaire de flotte expérimenté avec plus de 10 ans d\'expérience dans l\'optimisation logistique et la gestion d\'équipes. Passionné par l\'innovation et les nouvelles technologies.',
+    id: '',
+    user_id: user?.id || '',
+    full_name: '',
+    email: '',
+    phone: undefined,
+    bio: undefined,
     avatar_url: undefined,
-    location: 'Paris, France',
+    location: undefined,
     status: 'active',
-    created_at: '2021-03-15T10:00:00Z',
-    updated_at: '2025-01-18T14:30:00Z',
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
     preferences: {
       email_notifications: true,
       push_notifications: true,
@@ -96,7 +100,61 @@ const ProfileScreen = () => {
     confirm: false
   });
 
-  // Gestion upload avatar
+  // Charger le profil depuis Supabase
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      if (!user?.id) return;
+      setLoading(true);
+      try {
+        const { data, error } = await supabase.from('profiles').select('*').eq('user_id', user.id).maybeSingle();
+        if (error) throw error;
+        if (!cancelled) {
+          if (data) {
+            setProfile(prev => ({
+              ...prev,
+              id: data.id,
+              user_id: data.user_id,
+              full_name: data.full_name || '',
+              email: data.email || user.email || '',
+              phone: data.phone || undefined,
+              bio: data.bio || undefined,
+              avatar_url: data.avatar_url || undefined,
+              location: data.location || undefined,
+              status: data.status || 'active',
+              created_at: data.created_at || prev.created_at,
+              updated_at: data.updated_at || prev.updated_at,
+              preferences: {
+                email_notifications: data.email_notifications ?? true,
+                push_notifications: data.push_notifications ?? true,
+                sms_notifications: data.sms_notifications ?? false,
+                location_sharing: data.location_sharing ?? true,
+                auto_tracking: data.auto_tracking ?? false,
+                dark_mode: data.dark_mode ?? true,
+                language: data.language || 'fr',
+                timezone: data.timezone || 'Europe/Paris',
+              }
+            } as any));
+          } else {
+            // Créer un profil minimal si inexistant
+            const payload: any = { user_id: user.id, full_name: user.email?.split('@')[0] || 'Utilisateur', email: user.email || '' };
+            const { data: created, error: insErr } = await supabase.from('profiles').insert(payload).select('*').single();
+            if (insErr) throw insErr;
+            if (!cancelled) {
+              setProfile(prev => ({ ...prev, id: created.id, user_id: created.user_id, full_name: created.full_name || '', email: created.email || '' }));
+            }
+          }
+        }
+      } catch (e) {
+        console.error('[Profile] load error', e);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [user?.id]);
+
+  // Gestion upload avatar vers Supabase Storage (bucket: avatars)
   const handleAvatarUpload = async () => {
     const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
     
@@ -106,6 +164,7 @@ const ProfileScreen = () => {
     }
 
     const result = await ImagePicker.launchImageLibraryAsync({
+      // NOTE: newer API prefers ImagePicker.MediaType, but to keep compatibility use MediaTypeOptions
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: true,
       aspect: [1, 1],
@@ -113,15 +172,29 @@ const ProfileScreen = () => {
     });
 
     if (!result.canceled) {
-      setProfile(prev => ({
-        ...prev,
-        avatar_url: result.assets[0].uri
-      }));
-      Alert.alert('Succès', 'Photo de profil mise à jour');
+      try {
+        if (!user?.id) { Alert.alert('Erreur', 'Utilisateur non connecté'); return; }
+        const asset = result.assets[0];
+        const path = `avatars/${user.id}.jpg`;
+        // Transformer l'URI locale en Blob
+  const resp = await fetch(asset.uri);
+  const ab = await resp.arrayBuffer();
+  const { error: upErr } = await supabase.storage.from('avatars').upload(path, ab, { upsert: true, contentType: asset.mimeType || 'image/jpeg' });
+        if (upErr) throw upErr;
+        const { data: pub } = supabase.storage.from('avatars').getPublicUrl(path);
+        // Mettre à jour le profil avec l'URL publique
+        const { error: upProfErr } = await supabase.from('profiles').update({ avatar_url: pub.publicUrl }).eq('user_id', user.id);
+        if (upProfErr) throw upProfErr;
+        setProfile(prev => ({ ...prev, avatar_url: pub.publicUrl }));
+        Alert.alert('Succès', 'Photo de profil mise à jour');
+      } catch (e: any) {
+        console.error('[Profile] avatar upload error', e);
+        Alert.alert('Erreur', e.message || 'Echec de l\'upload');
+      }
     }
   };
 
-  const deleteAvatar = () => {
+  const deleteAvatar = async () => {
     Alert.alert(
       'Supprimer la photo',
       'Êtes-vous sûr de vouloir supprimer votre photo de profil ?',
@@ -130,32 +203,88 @@ const ProfileScreen = () => {
         { 
           text: 'Supprimer', 
           style: 'destructive',
-          onPress: () => {
-            setProfile(prev => ({ ...prev, avatar_url: undefined }));
-            Alert.alert('Succès', 'Photo de profil supprimée');
+          onPress: async () => {
+            try {
+              if (!user?.id) return;
+              const key = `avatars/${user.id}.jpg`;
+              await supabase.storage.from('avatars').remove([key]);
+              await supabase.from('profiles').update({ avatar_url: null }).eq('user_id', user.id);
+              setProfile(prev => ({ ...prev, avatar_url: undefined }));
+              Alert.alert('Succès', 'Photo de profil supprimée');
+            } catch (e: any) {
+              Alert.alert('Erreur', e.message || 'Suppression impossible');
+            }
           }
         }
       ]
     );
   };
 
-  // Sauvegarder profil
-  const saveProfile = () => {
-    Alert.alert('Succès', 'Profil mis à jour avec succès');
+  // Sauvegarder profil (Supabase)
+  const saveProfile = async () => {
+    try {
+      if (!user?.id) { Alert.alert('Erreur', 'Utilisateur non connecté'); return; }
+      setLoading(true);
+      const payload: any = {
+        full_name: profile.full_name,
+        email: profile.email,
+        phone: profile.phone ?? null,
+        bio: profile.bio ?? null,
+        location: profile.location ?? null,
+        // Settings à plat si colonnes existent
+        email_notifications: profile.preferences?.email_notifications ?? true,
+        push_notifications: profile.preferences?.push_notifications ?? true,
+        sms_notifications: profile.preferences?.sms_notifications ?? false,
+        location_sharing: profile.preferences?.location_sharing ?? true,
+        auto_tracking: profile.preferences?.auto_tracking ?? false,
+        dark_mode: profile.preferences?.dark_mode ?? true,
+        language: profile.preferences?.language ?? 'fr',
+        timezone: profile.preferences?.timezone ?? 'Europe/Paris',
+        updated_at: new Date().toISOString(),
+      };
+      const { error } = await supabase.from('profiles').update(payload).eq('user_id', user.id);
+      if (error) throw error;
+      Alert.alert('Succès', 'Profil mis à jour avec succès');
+    } catch (e: any) {
+      console.error('[Profile] save error', e);
+      Alert.alert('Erreur', e.message || 'Mise à jour impossible');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  // Sauvegarder paramètres
+  // Sauvegarder paramètres (local + remote)
   const saveSettings = (newSettings: Partial<UserSettings>) => {
     setSettings(prev => ({ ...prev, ...newSettings }));
     setProfile(prev => ({
       ...prev,
       preferences: { ...prev.preferences, ...newSettings } as UserSettings
     }));
+    // Persister côté base (meilleur effort)
+    (async () => {
+      try {
+        if (!user?.id) return;
+        const { error } = await supabase.from('profiles').update({
+          email_notifications: ('email_notifications' in newSettings) ? newSettings.email_notifications : undefined,
+          push_notifications: ('push_notifications' in newSettings) ? newSettings.push_notifications : undefined,
+          sms_notifications: ('sms_notifications' in newSettings) ? newSettings.sms_notifications : undefined,
+          location_sharing: ('location_sharing' in newSettings) ? newSettings.location_sharing : undefined,
+          auto_tracking: ('auto_tracking' in newSettings) ? newSettings.auto_tracking : undefined,
+          dark_mode: ('dark_mode' in newSettings) ? newSettings.dark_mode : undefined,
+          language: ('language' in newSettings) ? newSettings.language : undefined,
+          timezone: ('timezone' in newSettings) ? newSettings.timezone : undefined,
+          updated_at: new Date().toISOString(),
+        }).eq('user_id', user.id);
+        if (error) throw error;
+      } catch (e) {
+        console.warn('[Profile] settings save best-effort failed', e);
+      }
+    })();
     Alert.alert('Succès', 'Paramètres sauvegardés');
   };
 
   // Changer mot de passe
-  const changePassword = () => {
+  const changePassword = async () => {
     if (!passwords.current || !passwords.new || !passwords.confirm) {
       Alert.alert('Erreur', 'Tous les champs sont requis');
       return;
@@ -170,15 +299,22 @@ const ProfileScreen = () => {
       Alert.alert('Erreur', 'Le nouveau mot de passe doit contenir au moins 8 caractères');
       return;
     }
-
-    Alert.alert('Succès', 'Mot de passe mis à jour');
-    setShowPasswordModal(false);
-    setPasswords({ current: '', new: '', confirm: '' });
+    try {
+      // Supabase ne supporte pas la vérification du mot de passe actuel côté client.
+      const { error } = await supabase.auth.updateUser({ password: passwords.new });
+      if (error) throw error;
+      Alert.alert('Succès', 'Mot de passe mis à jour');
+      setShowPasswordModal(false);
+      setPasswords({ current: '', new: '', confirm: '' });
+    } catch (e: any) {
+      Alert.alert('Erreur', e.message || 'Impossible de changer le mot de passe');
+    }
   };
 
   // Supprimer compte
-  const deleteAccount = () => {
-    Alert.alert('Compte supprimé', 'Votre compte a été supprimé définitivement');
+  const deleteAccount = async () => {
+    // La suppression de compte nécessite un service role côté serveur (Edge Function/admin)
+    Alert.alert('Non disponible', 'Pour supprimer votre compte, contactez le support.');
     setShowDeleteModal(false);
   };
 

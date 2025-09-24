@@ -275,3 +275,13 @@ Quand une table ajoutée dans l'extension est intégrée officiellement :
 Documentation détaillée supplémentaire: `supabase/TYPES.md`.
 
 
+## Edge Functions ajoutées récemment
+
+- generate-invoice-pdf: génère un PDF de facture stylé avec logo (utilisé par l'app mobile Facturation)
+- generate-quote-pdf: génère un PDF de devis stylé avec logo
+
+Déploiement:
+
+- Via script: `npm run fn:deploy:core` (inclut les fonctions PDF)
+
+

@@ -2,6 +2,8 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '../config/supabase';
 import Toast from 'react-native-toast-message';
+import { Linking } from 'react-native';
+import Constants from 'expo-constants';
 
 interface AuthContextType {
   user: User | null;
@@ -9,6 +11,7 @@ interface AuthContextType {
   loading: boolean;
   signIn: (email: string, password: string) => Promise<{ error?: any }>;
   signUp: (email: string, password: string) => Promise<{ error?: any }>;
+  signInWithGoogle: () => Promise<{ error?: any }>;
   signOut: () => Promise<void>;
   isAuthenticated?: boolean;
 }
@@ -27,6 +30,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isExchanging, setIsExchanging] = useState(false);
+  const [handledUrls, setHandledUrls] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     // Configuration du listener d'état d'authentification
@@ -47,6 +52,43 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     return () => subscription.unsubscribe();
   }, []);
+
+  // Handle OAuth deep links: supabase appends access_token in fragment for mobile when using "token" flow.
+  useEffect(() => {
+    const handleUrl = async (event: { url: string } | string) => {
+      try {
+        // Supabase uses either fragment tokens or code for PKCE; try both helpers
+        const url = typeof event === 'string' ? event : event.url;
+        if (!url) return;
+        // Filter for our scheme and path
+        if (!(url.startsWith('fleetcheck://') && url.includes('/auth/callback'))) return;
+        if (handledUrls.has(url)) return; // already processed
+        setHandledUrls(prev => new Set(prev).add(url));
+        if (isExchanging) return;
+        setIsExchanging(true);
+        // Use exchangeCodeForSession which supports PKCE/code and fragment tokens
+        // @ts-ignore - typings may vary across versions
+        const { data, error } = await (supabase.auth as any).exchangeCodeForSession(url);
+        if (error) {
+          console.warn('[OAuth] Session exchange error:', error?.message);
+        }
+        if (data?.session) {
+          Toast.show({ type: 'success', text1: 'Connexion Google réussie' });
+        }
+      } catch (e: any) {
+        console.warn('[OAuth] Deep link handling error', e?.message || e);
+      } finally {
+        setIsExchanging(false);
+      }
+    };
+
+    const sub = Linking.addEventListener('url', handleUrl as any);
+    // Also handle the initial URL if app opened from a link
+    Linking.getInitialURL().then((initialUrl) => {
+      if (initialUrl) handleUrl(initialUrl as any);
+    });
+    return () => sub.remove();
+  }, [isExchanging]);
 
   const signIn = async (email: string, password: string) => {
     const { error } = await supabase.auth.signInWithPassword({
@@ -94,6 +136,38 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return { error };
   };
 
+  const signInWithGoogle = async () => {
+    try {
+      const redirectTo = `fleetcheck://auth/callback`;
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo,
+          skipBrowserRedirect: true,
+          queryParams: {
+            access_type: 'offline',
+            prompt: 'consent',
+          },
+        },
+      });
+      if (error) {
+        Toast.show({ type: 'error', text1: 'Google', text2: error.message });
+        return { error };
+      }
+      // On native, open the provider URL explicitly
+      if (data?.url) {
+        await Linking.openURL(data.url);
+      } else {
+        Toast.show({ type: 'error', text1: 'Google', text2: "URL d'authentification introuvable" });
+        return { error: new Error('missing oauth url') } as any;
+      }
+      return {};
+    } catch (e: any) {
+      Toast.show({ type: 'error', text1: 'Google', text2: e?.message || 'Erreur inconnue' });
+      return { error: e };
+    }
+  };
+
   const signOut = async () => {
     const { error } = await supabase.auth.signOut();
     
@@ -113,7 +187,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   return (
-    <AuthContext.Provider value={{ user, session, loading, signIn, signUp, signOut, isAuthenticated: !!user }}>
+    <AuthContext.Provider value={{ user, session, loading, signIn, signUp, signInWithGoogle, signOut, isAuthenticated: !!user }}>
       {children}
     </AuthContext.Provider>
   );

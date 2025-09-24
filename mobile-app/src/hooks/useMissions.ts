@@ -15,7 +15,7 @@ export const useMissions = () => {
       const { data, error } = await supabase
         .from('missions')
         .select('*')
-        .eq('driver_id', user.id)
+        .eq('created_by', user.id)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -47,9 +47,15 @@ export const useUpdateMissionStatus = () => {
 
   return useMutation({
     mutationFn: async ({ missionId, status }: { missionId: string; status: string }) => {
+      // TODO: La table missions n'a pas de colonne status actuellement
+      // Il faudra soit ajouter cette colonne soit utiliser un autre système de statut
+      
+      console.warn('useUpdateMissionStatus: colonne status non disponible dans la table missions');
+      
+      // Pour l'instant, on fait juste une mise à jour de updated_at
       const { data, error } = await supabase
         .from('missions')
-        .update({ status, updated_at: new Date().toISOString() })
+        .update({ updated_at: new Date().toISOString() })
         .eq('id', missionId)
         .select()
         .single();

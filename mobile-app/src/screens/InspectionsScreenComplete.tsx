@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   View,
   Text,
@@ -7,12 +7,14 @@ import {
   StyleSheet,
   ActivityIndicator,
   Dimensions,
-  Alert,
-  Modal,
-  TextInput
+  Alert
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
+import { supabase } from '../config/supabase';
+import { useAuth } from '../contexts/AuthContext';
+import { Linking, Image } from 'react-native';
+import { SUPABASE_PROJECT_URL } from '../config/supabase';
 // Hook Supabase inspections
 import { useInspectionMissions } from '../hooks/useInspections';
 
@@ -66,13 +68,46 @@ interface Mission {
 const { width } = Dimensions.get('window');
 
 export default function InspectionsScreenComplete({ navigation }: any) {
-  const { missions: dbMissions, isLoading, error } = useInspectionMissions();
+  const { user } = useAuth();
+  const { missions: dbMissions, isLoading, error, refetch } = useInspectionMissions();
   const [stats, setStats] = useState<InspectionStats | null>(null);
   const [missions, setMissions] = useState<Mission[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'dashboard' | 'missions' | 'inspections'>('dashboard');
-  const [showCreateModal, setShowCreateModal] = useState(false);
   const [filterStatus, setFilterStatus] = useState<string>('all');
+  // Reports state (mobile parity with web)
+  const [showArchived, setShowArchived] = useState(false);
+  const [reports, setReports] = useState<any[]>([]);
+  const [reportsLoading, setReportsLoading] = useState(false);
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [viewing, setViewing] = useState<any | null>(null);
+  const [viewLoading, setViewLoading] = useState(false);
+  const [depDetails, setDepDetails] = useState<any | null>(null);
+  const [arrDetails, setArrDetails] = useState<any | null>(null);
+  const [depPhotos, setDepPhotos] = useState<string[]>([]);
+  const [arrPhotos, setArrPhotos] = useState<string[]>([]);
+  const [depSigUrl, setDepSigUrl] = useState<string | null>(null);
+  const [arrSigUrl, setArrSigUrl] = useState<string | null>(null);
+
+  // Realtime: refetch when missions for this user change
+  useEffect(() => {
+    if (!user?.id) return;
+    const channel = supabase
+      .channel('inspections-missions-updates')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'missions', filter: `driver_id=eq.${user.id}` }, () => {
+        refetch();
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'missions', filter: `created_by=eq.${user.id}` }, () => {
+        refetch();
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'missions', filter: `donor_id=eq.${user.id}` }, () => {
+        refetch();
+      })
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user?.id, refetch]);
 
   useEffect(() => {
     if (isLoading) { setLoading(true); return; }
@@ -107,6 +142,59 @@ export default function InspectionsScreenComplete({ navigation }: any) {
     return mission.status === filterStatus;
   });
 
+  // PUBLIC URL builder (same as web normalize)
+  const normalizeKey = useCallback((path?: string | null): string | null => {
+    if (!path) return null;
+    if (/^https?:\/\//i.test(path)) return path;
+    let key = path.replace(/^\/+/, '');
+    key = key.replace(/^https?:\/\/[^/]+\//i, '');
+    const pubPrefix = 'storage/v1/object/public/mission-photos/';
+    if (key.startsWith(pubPrefix)) key = key.slice(pubPrefix.length);
+    if (key.startsWith('mission-photos/')) key = key.slice('mission-photos/'.length);
+    return key;
+  }, []);
+
+  const publicUrlFor = useCallback((path?: string | null) => {
+    if (!path) return null;
+    if (/^https?:\/\//i.test(path)) return path;
+    const key = normalizeKey(path);
+    if (!key) return null;
+    const { data } = supabase.storage.from('mission-photos').getPublicUrl(key);
+    return data.publicUrl || null;
+  }, [normalizeKey]);
+
+  const dataUrlSignatureMaybe = (obj: any): string | null => {
+    const cand = obj?.client_signature_data || obj?.client_signature_base64 || obj?.client_signature || null;
+    if (!cand || typeof cand !== 'string') return null;
+    if (cand.startsWith('data:image')) return cand;
+    if (/^[A-Za-z0-9+/=]+$/.test(cand) && cand.length > 100) return `data:image/png;base64,${cand}`;
+    return null;
+  };
+
+  const fetchReports = useCallback(async () => {
+    if (!user?.id) return;
+    setReportsLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('missions')
+        .select('*')
+        .eq('status', 'completed')
+        .order('updated_at', { ascending: false })
+        .limit(100);
+      if (error) throw error;
+      const list = (data || []) as any[];
+      setReports(list.filter(m => Boolean(m.archived) === Boolean(showArchived)));
+    } catch (e) {
+      console.error('fetchReports error', e);
+    } finally {
+      setReportsLoading(false);
+    }
+  }, [user?.id, showArchived]);
+
+  useEffect(() => {
+    if (activeTab === 'inspections') fetchReports();
+  }, [activeTab, fetchReports]);
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'pending': return '#f59e0b';
@@ -127,31 +215,197 @@ export default function InspectionsScreenComplete({ navigation }: any) {
     }
   };
 
+  const loadMissionDetails = useCallback(async (m: any) => {
+    setViewLoading(true);
+    try {
+      const [{ data: dep }, { data: arr }] = await Promise.all([
+        supabase.from('inspection_departures').select('*').eq('mission_id', m.id).maybeSingle(),
+        supabase.from('inspection_arrivals').select('*').eq('mission_id', m.id).maybeSingle(),
+      ]);
+      setDepDetails(dep || null);
+      setArrDetails(arr || null);
+      const depP = Array.isArray(dep?.photos) ? (dep?.photos as unknown as string[]) : [];
+      const arrP = Array.isArray(arr?.photos) ? (arr?.photos as unknown as string[]) : [];
+      setDepPhotos(depP);
+      setArrPhotos(arrP);
+      const depSig = dataUrlSignatureMaybe(dep) || publicUrlFor(dep?.client_signature_url || null);
+      const arrSig = dataUrlSignatureMaybe(arr) || publicUrlFor(arr?.client_signature_url || null);
+      setDepSigUrl(depSig);
+      setArrSigUrl(arrSig);
+    } finally {
+      setViewLoading(false);
+    }
+  }, [publicUrlFor]);
+
+  const openFullReport = async (m: any) => {
+    setViewing(m);
+    await loadMissionDetails(m);
+  };
+
+  const openPhoto = useCallback((path: string) => {
+    const project = (supabase as any).rest?.url?.replace(/\/rest\/v1\/?$/, '') || '';
+    const pngUrl = project ? `${project}/functions/v1/photo-png?path=${encodeURIComponent(path)}` : (publicUrlFor(path) || '');
+    if (pngUrl) Linking.openURL(pngUrl);
+  }, [publicUrlFor]);
+
+  const closeFullReport = () => {
+    setViewing(null);
+    setDepDetails(null);
+    setArrDetails(null);
+    setDepPhotos([]);
+    setArrPhotos([]);
+    setDepSigUrl(null);
+    setArrSigUrl(null);
+  };
+
+  const emailFullReport = async (m: any) => {
+    setBusyId(m.id);
+    try {
+      const [{ data: dep }, { data: arr }] = await Promise.all([
+        supabase.from('inspection_departures').select('photos').eq('mission_id', m.id).maybeSingle(),
+        supabase.from('inspection_arrivals').select('photos').eq('mission_id', m.id).maybeSingle(),
+      ]);
+      const depPhotos = Array.isArray(dep?.photos) ? (dep?.photos as unknown as string[]) : [];
+      const arrPhotos = Array.isArray(arr?.photos) ? (arr?.photos as unknown as string[]) : [];
+      const all = [...depPhotos, ...arrPhotos];
+  const links = all.map((p, i) => `Photo ${i + 1}: ${SUPABASE_PROJECT_URL}/functions/v1/photo-png?path=${encodeURIComponent(normalizeKey(p) || p)}`).join('\n');
+  const fnUrl = `${SUPABASE_PROJECT_URL}/functions/v1/zip-mission-photos?missionId=${encodeURIComponent(m.id)}`;
+      const subject = encodeURIComponent(`Rapport de mission ${m.reference || m.id}`);
+      const body = encodeURIComponent(`Bonjour,\n\nRapport: ${m.reference || m.id} – ${m.title || ''}\nPDF (bundle photos): ${fnUrl}\n\nLiens photos:\n${links}\n\nCordialement`);
+      const mailtoUrl = `mailto:?subject=${subject}&body=${body}`;
+      await Linking.openURL(mailtoUrl);
+    } catch (e) {
+      console.error('emailFullReport error', e);
+    } finally { setBusyId(null); }
+  };
+
+  const emailFullReportGmail = async (m: any) => {
+    setBusyId(m.id);
+    try {
+      const [{ data: dep }, { data: arr }] = await Promise.all([
+        supabase.from('inspection_departures').select('photos').eq('mission_id', m.id).maybeSingle(),
+        supabase.from('inspection_arrivals').select('photos').eq('mission_id', m.id).maybeSingle(),
+      ]);
+      const depPhotos = Array.isArray(dep?.photos) ? (dep?.photos as unknown as string[]) : [];
+      const arrPhotos = Array.isArray(arr?.photos) ? (arr?.photos as unknown as string[]) : [];
+      const all = [...depPhotos, ...arrPhotos];
+  const encodedLinks = all.map((p, i) => `Photo ${i + 1}: ${SUPABASE_PROJECT_URL}/functions/v1/photo-png?path=${encodeURIComponent(normalizeKey(p) || p)}`).join('%0A');
+      const fnUrl = `${SUPABASE_PROJECT_URL}/functions/v1/zip-mission-photos?missionId=${encodeURIComponent(m.id)}`;
+      const subject = encodeURIComponent(`Rapport de mission ${m.reference || m.id}`);
+      const bodyPrefix = encodeURIComponent(`Bonjour,\n\nRapport: ${m.reference || m.id} – ${m.title || ''}\nPDF (bundle photos): ${fnUrl}\n\nLiens photos:\n`);
+      const bodySuffix = encodeURIComponent(`\n\nCordialement`);
+      const gmailUrl = `https://mail.google.com/mail/?view=cm&fs=1&su=${subject}&body=${bodyPrefix}${encodedLinks}${bodySuffix}`;
+      await Linking.openURL(gmailUrl);
+    } catch (e) {
+      console.error('emailFullReportGmail error', e);
+    } finally { setBusyId(null); }
+  };
+
+  const toggleArchive = async (m: any, value: boolean) => {
+    setBusyId(m.id);
+    try {
+      const { error } = await supabase.from('missions').update({ archived: value } as any).eq('id', m.id);
+      if (error) throw error;
+      await fetchReports();
+    } catch (e) {
+      console.error('toggleArchive error', e);
+    } finally { setBusyId(null); }
+  };
+
   const handleCreateMission = () => {
+    // Ouvre l'écran de création avec le même formulaire que le web
+    navigation.navigate('CreateMission');
+  };
+
+  const handleViewMission = (mission: Mission) => {
+    // Ouvrir le wizard d'inspection côté mobile
+    navigation.navigate('MissionWizard', {
+      missionId: mission.id,
+      title: mission.title,
+      reference: mission.reference,
+      pickup_address: mission.departure?.address,
+      delivery_address: mission.arrival?.address,
+    });
+  };
+
+  const handleAssignMission = (mission: Mission) => {
+    // TODO: Implémenter l'assignation de mission
+    // Ouvrir un modal avec liste des chauffeurs disponibles
     Alert.alert(
-      'Nouvelle mission',
-      'Créer une nouvelle mission d\'inspection ?',
+      'Assigner la mission',
+      `Voulez-vous assigner la mission ${mission.reference} ?`,
       [
         { text: 'Annuler', style: 'cancel' },
-        {
-          text: 'Créer',
-          onPress: () => {
-            setShowCreateModal(true);
-          }
-        }
+        { text: 'Assigner', onPress: () => {
+          // Logique d'assignation ici
+          console.log('Assigning mission:', mission.id);
+        }}
       ]
     );
   };
 
-  const handleViewMission = (mission: Mission) => {
-    Alert.alert(
-      mission.title,
-      `Référence: ${mission.reference}\nStatut: ${getStatusLabel(mission.status)}\n\nInspections:\n• Départ: ${mission.inspections.departure ? 'Oui' : 'Non'}\n• Arrivée: ${mission.inspections.arrival ? 'Oui' : 'Non'}\n• GPS: ${mission.inspections.gpsTracking ? 'Oui' : 'Non'}`,
-      [
-        { text: 'Fermer', style: 'cancel' },
-        { text: 'Voir détails', onPress: () => {} }
-      ]
-    );
+  const handleDownloadPDF = async (mission: Mission) => {
+    try {
+      const { data, error } = await supabase.functions.invoke('generate-mission-summary', {
+        body: {
+          missionId: mission.id,
+          action: 'download'
+        }
+      });
+
+      if (error) {
+        console.error('Error generating PDF:', error);
+        Alert.alert('Erreur', 'Impossible de générer le PDF');
+        return;
+      }
+
+      // Pour le moment, on informe juste l'utilisateur
+      Alert.alert(
+        'PDF généré',
+        `Le résumé PDF de la mission ${mission.reference} a été généré avec succès.`,
+        [{ text: 'OK' }]
+      );
+    } catch (error) {
+      console.error('Error downloading PDF:', error);
+      Alert.alert('Erreur', 'Impossible de télécharger le PDF');
+    }
+  };
+
+  const handlePreviewMission = async (mission: Mission) => {
+    try {
+      const { data, error } = await supabase.functions.invoke('generate-mission-summary', {
+        body: {
+          missionId: mission.id,
+          action: 'preview'
+        }
+      });
+
+      if (error) {
+        console.error('Error generating preview:', error);
+        Alert.alert('Erreur', 'Impossible de générer l\'aperçu');
+        return;
+      }
+
+      // Afficher les détails de la mission
+      const statusLabel = getStatusLabel(mission.status);
+      const createdDate = new Date(mission.created_at).toLocaleDateString('fr-FR');
+      
+      Alert.alert(
+        'Aperçu de la mission',
+        `📋 ${mission.title}
+📦 Réf: ${mission.reference}
+📍 ${mission.departure.city} → ${mission.arrival.city}
+🚗 ${mission.vehicle.brand} ${mission.vehicle.model}
+📅 Créée le ${createdDate}
+📊 Statut: ${statusLabel}
+
+✅ PDF généré avec succès`,
+        [{ text: 'Fermer' }]
+      );
+    } catch (error) {
+      console.error('Error previewing mission:', error);
+      Alert.alert('Erreur', 'Impossible de générer l\'aperçu');
+    }
   };
 
   if (loading) {
@@ -441,6 +695,58 @@ export default function InspectionsScreenComplete({ navigation }: any) {
                       </View>
                     )}
                   </View>
+
+                  <View style={styles.missionActions}>
+                    <TouchableOpacity 
+                      style={[styles.actionButton, { backgroundColor: '#06b6d4', borderColor: 'transparent' }]}
+                      onPress={(e) => {
+                        e.stopPropagation();
+                        navigation.navigate('MissionWizard', {
+                          missionId: mission.id,
+                          title: mission.title,
+                          reference: mission.reference,
+                          pickup_address: mission.departure?.address,
+                          delivery_address: mission.arrival?.address,
+                          initialStep: 'departure',
+                        });
+                      }}
+                    >
+                      <MaterialCommunityIcons name="play" size={16} color="#ffffff" />
+                      <Text style={[styles.actionButtonText, { color: '#ffffff', fontWeight: '700' }]}>Démarrer</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity 
+                      style={styles.actionButton}
+                      onPress={(e) => {
+                        e.stopPropagation();
+                        handleAssignMission(mission);
+                      }}
+                    >
+                      <MaterialCommunityIcons name="account-plus" size={16} color="#6366f1" />
+                      <Text style={styles.actionButtonText}>Assigner</Text>
+                    </TouchableOpacity>
+                    
+                    <TouchableOpacity 
+                      style={styles.actionButton}
+                      onPress={(e) => {
+                        e.stopPropagation();
+                        handleDownloadPDF(mission);
+                      }}
+                    >
+                      <MaterialCommunityIcons name="download" size={16} color="#059669" />
+                      <Text style={styles.actionButtonText}>PDF</Text>
+                    </TouchableOpacity>
+                    
+                    <TouchableOpacity 
+                      style={styles.actionButton}
+                      onPress={(e) => {
+                        e.stopPropagation();
+                        handlePreviewMission(mission);
+                      }}
+                    >
+                      <MaterialCommunityIcons name="eye" size={16} color="#0891b2" />
+                      <Text style={styles.actionButtonText}>Voir</Text>
+                    </TouchableOpacity>
+                  </View>
                 </TouchableOpacity>
               ))}
 
@@ -461,127 +767,159 @@ export default function InspectionsScreenComplete({ navigation }: any) {
         )}
 
         {activeTab === 'inspections' && (
-          <View style={styles.inspectionsContent}>
-            <View style={styles.inspectionStats}>
-              <Text style={styles.inspectionsTitle}>Rapports d'inspection</Text>
-              
-              <View style={styles.reportCard}>
-                <View style={styles.reportHeader}>
-                  <MaterialCommunityIcons name="file-chart" size={20} color="#06b6d4" />
-                  <Text style={styles.reportTitle}>Rapport mensuel</Text>
-                </View>
-                <Text style={styles.reportDescription}>
-                  Synthèse des inspections du mois en cours
-                </Text>
-                <TouchableOpacity style={styles.reportButton}>
-                  <Text style={styles.reportButtonText}>Générer</Text>
-                </TouchableOpacity>
-              </View>
-
-              <View style={styles.reportCard}>
-                <View style={styles.reportHeader}>
-                  <MaterialCommunityIcons name="file-table" size={20} color="#10b981" />
-                  <Text style={styles.reportTitle}>Export données</Text>
-                </View>
-                <Text style={styles.reportDescription}>
-                  Export Excel de toutes les inspections
-                </Text>
-                <TouchableOpacity style={styles.reportButton}>
-                  <Text style={styles.reportButtonText}>Exporter</Text>
-                </TouchableOpacity>
-              </View>
+          <View style={{ padding: 16 }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+              <Text style={{ color: 'white', fontWeight: 'bold', fontSize: 18 }}>Rapports</Text>
+              <TouchableOpacity onPress={() => setShowArchived(s => !s)} style={{ paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8, borderWidth: 1, borderColor: 'rgba(6,182,212,0.5)', backgroundColor: showArchived ? 'rgba(6,182,212,0.2)' : 'transparent' }}>
+                <Text style={{ color: '#06b6d4' }}>{showArchived ? 'Voir actifs' : 'Voir archivés'}</Text>
+              </TouchableOpacity>
             </View>
+
+            {reportsLoading ? (
+              <View style={{ paddingVertical: 24, alignItems: 'center' }}>
+                <ActivityIndicator color="#06b6d4" />
+                <Text style={{ color: '#9ca3af', marginTop: 8 }}>Chargement…</Text>
+              </View>
+            ) : reports.length === 0 ? (
+              <View style={{ paddingVertical: 24, alignItems: 'center' }}>
+                <MaterialCommunityIcons name="file-document-outline" size={40} color="#6b7280" />
+                <Text style={{ color: '#9ca3af', marginTop: 8 }}>Aucun rapport</Text>
+              </View>
+            ) : (
+              <View>
+                {reports.map(m => (
+                  <View key={m.id} style={{ backgroundColor: 'rgba(30,41,59,0.5)', borderRadius: 12, padding: 12, marginBottom: 10, borderWidth: 1, borderColor: 'rgba(55,65,81,0.5)' }}>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <View style={{ flex: 1, paddingRight: 8 }}>
+                        <Text style={{ color: 'white', fontWeight: '600' }} numberOfLines={1}>{m.title || 'Mission'}</Text>
+                        <Text style={{ color: '#9ca3af' }} numberOfLines={1}>Réf: {m.reference}</Text>
+                        <Text style={{ color: '#9ca3af' }} numberOfLines={1}>{m.pickup_address || '-'} → {m.delivery_address || '-'}</Text>
+                      </View>
+                      <TouchableOpacity onPress={() => openFullReport(m)} style={{ padding: 8, borderRadius: 8, borderWidth: 1, borderColor: 'rgba(8,145,178,0.6)', backgroundColor: 'rgba(8,145,178,0.2)' }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                          <MaterialCommunityIcons name="eye" size={16} color="#0891b2" />
+                          <Text style={{ color: '#0891b2', marginLeft: 6, fontWeight: '600' }}>Voir</Text>
+                        </View>
+                      </TouchableOpacity>
+                    </View>
+                    <View style={{ flexDirection: 'row', marginTop: 10, gap: 8 }}>
+                      <TouchableOpacity disabled={busyId===m.id} onPress={() => emailFullReport(m)} style={{ flex: 1, paddingVertical: 10, borderRadius: 8, backgroundColor: '#0e7490', alignItems: 'center' }}>
+                        <Text style={{ color: 'white', fontWeight: '600' }}>Email</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity disabled={busyId===m.id} onPress={() => emailFullReportGmail(m)} style={{ flex: 1, paddingVertical: 10, borderRadius: 8, borderWidth: 1, borderColor: 'rgba(55,65,81,0.5)', alignItems: 'center' }}>
+                        <Text style={{ color: '#e5e7eb', fontWeight: '600' }}>Gmail</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity disabled={busyId===m.id} onPress={() => toggleArchive(m, !m.archived)} style={{ paddingVertical: 10, paddingHorizontal: 12, borderRadius: 8, borderWidth: 1, borderColor: 'rgba(55,65,81,0.5)' }}>
+                        <Text style={{ color: '#e5e7eb', fontWeight: '600' }}>{m.archived ? 'Désarchiver' : 'Archiver'}</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                ))}
+              </View>
+            )}
+
+            {/* Full report modal-like card */}
+            {viewing && (
+              <View style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', padding: 16 }}>
+                <View style={{ backgroundColor: '#111827', borderRadius: 12, borderWidth: 1, borderColor: 'rgba(55,65,81,0.6)', maxHeight: '80%', }}>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: 'rgba(55,65,81,0.6)' }}>
+                    <Text style={{ color: '#e5e7eb', fontWeight: '700' }}>Rapport complet</Text>
+                    <TouchableOpacity onPress={closeFullReport}>
+                      <MaterialCommunityIcons name="close" size={22} color="#9ca3af" />
+                    </TouchableOpacity>
+                  </View>
+                  {viewLoading ? (
+                    <View style={{ padding: 20, alignItems: 'center' }}>
+                      <ActivityIndicator color="#06b6d4" />
+                      <Text style={{ color: '#9ca3af', marginTop: 8 }}>Chargement…</Text>
+                    </View>
+                  ) : (
+                    <ScrollView style={{ padding: 12 }}>
+                      <View style={{ backgroundColor: 'rgba(30,41,59,0.5)', borderRadius: 8, padding: 10, borderWidth: 1, borderColor: 'rgba(55,65,81,0.6)', marginBottom: 8 }}>
+                        <Text style={{ color: '#e5e7eb', fontWeight: '700' }}>{viewing.title}</Text>
+                        <Text style={{ color: '#9ca3af' }}>Réf: {viewing.reference}</Text>
+                        <Text style={{ color: '#9ca3af' }}>De: {viewing.pickup_address || '-'}</Text>
+                        <Text style={{ color: '#9ca3af' }}>À: {viewing.delivery_address || '-'}</Text>
+                      </View>
+                      <View style={{ backgroundColor: 'rgba(30,41,59,0.5)', borderRadius: 8, padding: 10, borderWidth: 1, borderColor: 'rgba(55,65,81,0.6)', marginBottom: 8 }}>
+                        <Text style={{ color: '#06b6d4', fontWeight: '700', marginBottom: 6 }}>Départ</Text>
+                        <Text style={{ color: '#9ca3af' }}>Kilométrage: {depDetails?.initial_mileage ?? '-'}</Text>
+                        <Text style={{ color: '#9ca3af' }}>% Carburant: {depDetails?.fuel_percent ?? '-'}</Text>
+                        <Text style={{ color: '#9ca3af' }}>Clés: {depDetails?.keys_count != null ? (depDetails?.keys_count === 2 ? '2+' : String(depDetails?.keys_count)) : '-'}</Text>
+                        <Text style={{ color: '#9ca3af' }}>Carte carburant: {depDetails?.has_fuel_card ? 'Oui' : 'Non'}</Text>
+                        <Text style={{ color: '#9ca3af' }}>Docs de bord: {depDetails?.has_board_documents ? 'Oui' : 'Non'}</Text>
+                        <Text style={{ color: '#9ca3af' }}>PV de livraison: {depDetails?.has_delivery_report ? 'Oui' : 'Non'}</Text>
+                        <Text style={{ color: '#9ca3af' }}>Email client: {depDetails?.client_email ?? '-'}</Text>
+                        <Text style={{ color: '#9ca3af' }}>Notes internes: {depDetails?.internal_notes ?? '-'}</Text>
+                      </View>
+                      <View style={{ backgroundColor: 'rgba(30,41,59,0.5)', borderRadius: 8, padding: 10, borderWidth: 1, borderColor: 'rgba(55,65,81,0.6)', marginBottom: 8 }}>
+                        <Text style={{ color: '#06b6d4', fontWeight: '700', marginBottom: 6 }}>Arrivée</Text>
+                        <Text style={{ color: '#9ca3af' }}>Kilométrage: {arrDetails?.final_mileage ?? '-'}</Text>
+                        <Text style={{ color: '#9ca3af' }}>Carburant: {arrDetails?.final_fuel ?? '-'}</Text>
+                        <Text style={{ color: '#9ca3af' }}>Notes conducteur: {arrDetails?.driver_notes ?? '-'}</Text>
+                        <Text style={{ color: '#9ca3af' }}>Notes client: {arrDetails?.client_notes ?? '-'}</Text>
+                      </View>
+                      <View style={{ backgroundColor: 'rgba(30,41,59,0.5)', borderRadius: 8, padding: 10, borderWidth: 1, borderColor: 'rgba(55,65,81,0.6)', marginBottom: 8 }}>
+                        <Text style={{ color: '#06b6d4', fontWeight: '700', marginBottom: 6 }}>Signatures</Text>
+                        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                          <View style={{ flexDirection: 'row', gap: 10 }}>
+                            <View style={{ width: 200, height: 140, borderRadius: 8, borderWidth: 1, borderColor: 'rgba(55,65,81,0.6)', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+                              <Text style={{ color: '#9ca3af', marginBottom: 6 }}>Départ</Text>
+                              {depSigUrl ? (
+                                <Image source={{ uri: depSigUrl }} style={{ width: 180, height: 100, resizeMode: 'contain' }} />
+                              ) : (
+                                <Text style={{ color: '#6b7280' }}>(Aucune)</Text>
+                              )}
+                            </View>
+                            <View style={{ width: 200, height: 140, borderRadius: 8, borderWidth: 1, borderColor: 'rgba(55,65,81,0.6)', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+                              <Text style={{ color: '#9ca3af', marginBottom: 6 }}>Arrivée</Text>
+                              {arrSigUrl ? (
+                                <Image source={{ uri: arrSigUrl }} style={{ width: 180, height: 100, resizeMode: 'contain' }} />
+                              ) : (
+                                <Text style={{ color: '#6b7280' }}>(Aucune)</Text>
+                              )}
+                            </View>
+                          </View>
+                        </ScrollView>
+                      </View>
+                      <View style={{ backgroundColor: 'rgba(30,41,59,0.5)', borderRadius: 8, padding: 10, borderWidth: 1, borderColor: 'rgba(55,65,81,0.6)', marginBottom: 8 }}>
+                        <Text style={{ color: '#06b6d4', fontWeight: '700', marginBottom: 6 }}>Photos départ</Text>
+                        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                          <View style={{ flexDirection: 'row', gap: 8 }}>
+                            {depPhotos.length === 0 ? (
+                              <Text style={{ color: '#6b7280' }}>(Aucune)</Text>
+                            ) : depPhotos.map((p, idx) => (
+                              <TouchableOpacity key={`dep-${idx}`} onPress={() => openPhoto(p)} style={{ width: 120, height: 90, borderRadius: 8, borderWidth: 1, borderColor: 'rgba(55,65,81,0.6)', overflow: 'hidden' }}>
+                                <Image source={{ uri: publicUrlFor(p) || undefined }} style={{ width: '100%', height: '100%' }} />
+                              </TouchableOpacity>
+                            ))}
+                          </View>
+                        </ScrollView>
+                      </View>
+                      <View style={{ backgroundColor: 'rgba(30,41,59,0.5)', borderRadius: 8, padding: 10, borderWidth: 1, borderColor: 'rgba(55,65,81,0.6)', marginBottom: 8 }}>
+                        <Text style={{ color: '#06b6d4', fontWeight: '700', marginBottom: 6 }}>Photos arrivée</Text>
+                        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                          <View style={{ flexDirection: 'row', gap: 8 }}>
+                            {arrPhotos.length === 0 ? (
+                              <Text style={{ color: '#6b7280' }}>(Aucune)</Text>
+                            ) : arrPhotos.map((p, idx) => (
+                              <TouchableOpacity key={`arr-${idx}`} onPress={() => openPhoto(p)} style={{ width: 120, height: 90, borderRadius: 8, borderWidth: 1, borderColor: 'rgba(55,65,81,0.6)', overflow: 'hidden' }}>
+                                <Image source={{ uri: publicUrlFor(p) || undefined }} style={{ width: '100%', height: '100%' }} />
+                              </TouchableOpacity>
+                            ))}
+                          </View>
+                        </ScrollView>
+                      </View>
+                    </ScrollView>
+                  )}
+                </View>
+              </View>
+            )}
           </View>
         )}
       </ScrollView>
 
-      {/* Create Mission Modal */}
-      <Modal
-        visible={showCreateModal}
-        animationType="slide"
-        transparent={true}
-        onRequestClose={() => setShowCreateModal(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Nouvelle mission</Text>
-              <TouchableOpacity
-                style={styles.modalClose}
-                onPress={() => setShowCreateModal(false)}
-              >
-                <Feather name="x" size={24} color="#9ca3af" />
-              </TouchableOpacity>
-            </View>
-
-            <ScrollView style={styles.modalBody}>
-              <View style={styles.formSection}>
-                <Text style={styles.formLabel}>Titre de la mission</Text>
-                <TextInput
-                  style={styles.formInput}
-                  placeholder="Ex: Transport BMW X5"
-                  placeholderTextColor="#9ca3af"
-                />
-              </View>
-
-              <View style={styles.formSection}>
-                <Text style={styles.formLabel}>Description</Text>
-                <TextInput
-                  style={[styles.formInput, styles.textArea]}
-                  placeholder="Description de la mission..."
-                  placeholderTextColor="#9ca3af"
-                  multiline
-                  numberOfLines={3}
-                />
-              </View>
-
-              <View style={styles.formSection}>
-                <Text style={styles.formLabel}>Options d'inspection</Text>
-                <View style={styles.checkboxGroup}>
-                  <TouchableOpacity style={styles.checkboxItem}>
-                    <View style={[styles.checkbox, styles.checkboxActive]}>
-                      <Feather name="check" size={12} color="white" />
-                    </View>
-                    <Text style={styles.checkboxText}>Inspection départ</Text>
-                  </TouchableOpacity>
-                  
-                  <TouchableOpacity style={styles.checkboxItem}>
-                    <View style={[styles.checkbox, styles.checkboxActive]}>
-                      <Feather name="check" size={12} color="white" />
-                    </View>
-                    <Text style={styles.checkboxText}>Inspection arrivée</Text>
-                  </TouchableOpacity>
-                  
-                  <TouchableOpacity style={styles.checkboxItem}>
-                    <View style={styles.checkbox}>
-                    </View>
-                    <Text style={styles.checkboxText}>Tracking GPS</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            </ScrollView>
-
-            <View style={styles.modalActions}>
-              <TouchableOpacity
-                style={styles.cancelButton}
-                onPress={() => setShowCreateModal(false)}
-              >
-                <Text style={styles.cancelButtonText}>Annuler</Text>
-              </TouchableOpacity>
-              
-              <TouchableOpacity
-                style={styles.createButton}
-                onPress={() => {
-                  setShowCreateModal(false);
-                  Alert.alert('Mission créée', 'La nouvelle mission a été créée avec succès !');
-                }}
-              >
-                <Text style={styles.createButtonText}>Créer</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
+      {/* Création de mission: remplacé par l'écran CreateMission */}
     </SafeAreaView>
   );
 }
@@ -943,6 +1281,30 @@ const styles = StyleSheet.create({
   flagText: {
     color: '#d1d5db',
     fontSize: 10,
+    fontWeight: '500',
+  },
+  missionActions: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(55, 65, 81, 0.3)',
+  },
+  actionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(55, 65, 81, 0.4)',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 6,
+    gap: 4,
+    flex: 1,
+    justifyContent: 'center',
+  },
+  actionButtonText: {
+    color: '#d1d5db',
+    fontSize: 11,
     fontWeight: '500',
   },
   emptyState: {

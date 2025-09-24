@@ -5,8 +5,7 @@ param(
   [ValidateSet('disable','allow','prefer','require','verify-ca','verify-full')] [string]$SslMode = "require",
   [string]$WorkspaceRoot = $(if ($PSScriptRoot) { Split-Path -Parent $PSScriptRoot } else { (Get-Location).Path }),
   [switch]$MakeBucketPublic,
-  [string[]]$OnlyThese,
-  [string]$Password
+  [string[]]$OnlyThese
 )
 
 function Write-Section($text) { Write-Host "`n=== $text ===" -ForegroundColor Cyan }
@@ -19,19 +18,14 @@ $psql = Get-Command psql -ErrorAction SilentlyContinue
 if (-not $psql) { Write-Err "psql introuvable. Installe PostgreSQL client et/ou ajoute psql au PATH."; exit 1 }
 
 if (-not $env:PGPASSWORD) {
-  if ($Password) {
-    # Utilise le mot de passe passé en paramètre (attention: visible dans l'historique de commande)
-    $env:PGPASSWORD = $Password
-  } else {
-    Write-Warn "PGPASSWORD non défini dans cette session. Il sera demandé une fois (non affiché)."
-    $secure = Read-Host "Mot de passe DB ($User@$DbHost)" -AsSecureString
-    try {
-      $bstr = [System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($secure)
-      $plain = [System.Runtime.InteropServices.Marshal]::PtrToStringBSTR($bstr)
-    } finally {
-      if ($bstr) { [System.Runtime.InteropServices.Marshal]::ZeroFreeBSTR($bstr) }
-    }
+  Write-Warn "PGPASSWORD non défini dans cette session. Il sera demandé une fois (non affiché)."
+  $secure = Read-Host "Mot de passe DB ($User@$DbHost)" -AsSecureString
+  try {
+    $bstr = [System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($secure)
+    $plain = [System.Runtime.InteropServices.Marshal]::PtrToStringBSTR($bstr)
     $env:PGPASSWORD = $plain
+  } finally {
+    if ($bstr) { [System.Runtime.InteropServices.Marshal]::ZeroFreeBSTR($bstr) }
   }
 }
 
@@ -74,7 +68,7 @@ if ($MakeBucketPublic) {
 }
 
 Write-Section "Vérifications finales"
-& psql "$Conn" -c "select id, public from storage.buckets where id='mission-photos';" | Out-Host
-& psql "$Conn" -c "select policyname, roles, cmd from pg_policies where schemaname='storage' and tablename='objects' and policyname like 'mission-photos%';" | Out-Host
+& psql "$Conn" -c "select id, public from storage.buckets where id in ('mission-photos','company-logos');" | Out-Host
+& psql "$Conn" -c "select policyname, roles, cmd from pg_policies where schemaname='storage' and tablename='objects' and (policyname like 'mission-photos%' or policyname like 'company-logos%');" | Out-Host
 
 Write-Ok "Terminé"

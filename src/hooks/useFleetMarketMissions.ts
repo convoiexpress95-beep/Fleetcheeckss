@@ -10,7 +10,29 @@ export function useFleetMarketMissions(){
 
   const publish = useMutation({
     mutationFn: (p: Omit<FleetMarketMission,'id'|'statut'>) => publishMission(p as any),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: KEY }); }
+    onMutate: async (vars) => {
+      await qc.cancelQueries({ queryKey: KEY });
+      const prev = qc.getQueryData<FleetMarketMission[]>(KEY) || [];
+      // Optimistic insert placeholder
+      const optimistic: FleetMarketMission = {
+        id: `tmp-${Date.now()}`,
+        titre: vars.titre,
+        description: vars.description || '',
+        ville_depart: vars.ville_depart,
+        ville_arrivee: vars.ville_arrivee,
+        date_depart: vars.date_depart,
+        prix_propose: vars.prix_propose,
+        statut: 'ouverte',
+        vehicule_requis: vars.vehicule_requis,
+        convoyeur_id: null,
+      } as any;
+      qc.setQueryData<FleetMarketMission[]>(KEY, [optimistic, ...prev]);
+      return { prev };
+    },
+    onError: (_e, _vars, ctx) => {
+      if (ctx?.prev) qc.setQueryData(KEY, ctx.prev);
+    },
+    onSettled: () => { qc.invalidateQueries({ queryKey: KEY }); }
   });
 
   const setStatus = useMutation({

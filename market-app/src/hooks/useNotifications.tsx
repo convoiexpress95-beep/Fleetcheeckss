@@ -44,11 +44,29 @@ export const useNotifications = () => {
         const twentyFourHoursAgo = new Date();
         twentyFourHoursAgo.setHours(twentyFourHoursAgo.getHours() - 24);
 
-        const { count: newMissionsCount } = await supabase
-          .from('marketplace_missions')
-          .select('*', { count: 'exact', head: true })
-          .eq('statut', 'ouverte')
-          .gte('created_at', twentyFourHoursAgo.toISOString());
+        // Préférence: table, fallback: vue
+        let newMissionsCount = 0;
+        try {
+          const { count, error } = await supabase
+            .from('fleetmarket_missions' as any)
+            .select('*', { count: 'exact', head: true })
+            .eq('statut', 'ouverte')
+            .gte('created_at', twentyFourHoursAgo.toISOString());
+          if (error) throw error;
+          newMissionsCount = count || 0;
+        } catch (e: any) {
+          const msg = String(e?.message || e?.error || '').toLowerCase();
+          if (msg.includes('relation') && (msg.includes('does not exist') || msg.includes('not exist') || msg.includes('undefined table'))) {
+            const { count } = await supabase
+              .from('marketplace_missions' as any)
+              .select('*', { count: 'exact', head: true })
+              .eq('statut', 'ouverte')
+              .gte('created_at', twentyFourHoursAgo.toISOString());
+            newMissionsCount = count || 0;
+          } else {
+            throw e;
+          }
+        }
 
         setCounts({
           messages: unreadMessagesCount,
@@ -95,6 +113,7 @@ export const useNotifications = () => {
       .subscribe();
 
     // Écouter les nouvelles missions en temps réel
+    // Realtime sur la table; fallback: vue si la table n'est pas publiée
     const missionsChannel = supabase
       .channel('missions-notifications')
       .on(
@@ -102,14 +121,29 @@ export const useNotifications = () => {
         {
           event: 'INSERT',
           schema: 'public',
-          table: 'marketplace_missions'
+          table: 'fleetmarket_missions' as any
         },
         (payload) => {
-          if (payload.new.statut === 'ouverte') {
-            setCounts(prev => ({
-              ...prev,
-              missions: prev.missions + 1
-            }));
+          if ((payload as any).new?.statut === 'ouverte') {
+            setCounts(prev => ({ ...prev, missions: prev.missions + 1 }));
+          }
+        }
+      )
+      .subscribe();
+
+    // Canal de secours sur l'ancienne vue si besoin
+    const missionsChannelFallback = supabase
+      .channel('missions-notifications-fallback')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'marketplace_missions' as any
+        },
+        (payload) => {
+          if ((payload as any).new?.statut === 'ouverte') {
+            setCounts(prev => ({ ...prev, missions: prev.missions + 1 }));
           }
         }
       )
@@ -139,7 +173,8 @@ export const useNotifications = () => {
 
     return () => {
       supabase.removeChannel(messagesChannel);
-      supabase.removeChannel(missionsChannel);
+  supabase.removeChannel(missionsChannel);
+  supabase.removeChannel(missionsChannelFallback);
       supabase.removeChannel(messageUpdatesChannel);
     };
   }, [user]);

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -9,7 +9,8 @@ import {
   ActivityIndicator,
   Alert,
   Modal,
-  Pressable
+  Pressable,
+  FlatList
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather, MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
@@ -17,6 +18,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useMarketplaceMissions } from '../hooks/useMarketplace';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../config/supabase';
+import { useNavigation } from '@react-navigation/native';
 
 interface Mission {
   id: string;
@@ -34,6 +36,7 @@ interface Mission {
 }
 
 export default function MarketplaceScreenComplete({ navigation }: any) {
+  const nav = useNavigation<any>();
   const { user } = useAuth();
   const { missions: dbMissions, isLoading, error, refetch } = useMarketplaceMissions();
   const [missions, setMissions] = useState<Mission[]>([]);
@@ -41,6 +44,13 @@ export default function MarketplaceScreenComplete({ navigation }: any) {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedFilters, setSelectedFilters] = useState<string[]>([]);
   const [filterModalVisible, setFilterModalVisible] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [sortBy, setSortBy] = useState<'recent' | 'price_asc' | 'price_desc'>('recent');
+  const [favorites, setFavorites] = useState<Set<string>>(new Set());
+  const [detailsModalVisible, setDetailsModalVisible] = useState(false);
+  const [detailsMission, setDetailsMission] = useState<Mission | null>(null);
+  const [customPrice, setCustomPrice] = useState<string>('');
+  const [customMessage, setCustomMessage] = useState<string>('');
   const [stats, setStats] = useState({
     totalMissions: 0,
     assignedMissions: 0,
@@ -79,11 +89,45 @@ export default function MarketplaceScreenComplete({ navigation }: any) {
     setLoading(false);
   }, [dbMissions, isLoading, error]);
 
-  const filteredMissions = missions.filter(mission =>
-    mission.titre.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    mission.ville_depart.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    mission.ville_arrivee.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredMissions = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    let list = missions.filter(mission =>
+      !q ||
+      mission.titre.toLowerCase().includes(q) ||
+      mission.ville_depart.toLowerCase().includes(q) ||
+      mission.ville_arrivee.toLowerCase().includes(q)
+    );
+
+    if (selectedFilters.length) {
+      list = list.filter(m => {
+        // City filters
+        const cityFilters = selectedFilters.filter(f => ['paris','lyon','marseille','lille'].includes(f.toLowerCase()));
+        const matchCity = cityFilters.length === 0 || cityFilters.some(cf =>
+          m.ville_depart.toLowerCase().includes(cf) || m.ville_arrivee.toLowerCase().includes(cf)
+        );
+        // Vehicle filters
+        const vehFilters = selectedFilters.filter(f => ['berline','suv','véhicule de luxe','vehicule de luxe'].includes(f.toLowerCase()));
+        const veh = (m.vehicule_requis || '').toLowerCase();
+        const matchVeh = vehFilters.length === 0 || vehFilters.some(vf => veh.includes(vf));
+        // Urgent filter: naive match on description/title
+        const urgentOn = selectedFilters.includes('Urgent');
+        const matchUrgent = !urgentOn || (m.description || m.titre).toLowerCase().includes('urgent');
+        return matchCity && matchVeh && matchUrgent;
+      });
+    }
+
+    // Sort
+    list = list.slice().sort((a, b) => {
+      if (sortBy === 'recent') {
+        return new Date(b.date_mission).getTime() - new Date(a.date_mission).getTime();
+      }
+      if (sortBy === 'price_asc') return (a.prix_propose ?? 0) - (b.prix_propose ?? 0);
+      if (sortBy === 'price_desc') return (b.prix_propose ?? 0) - (a.prix_propose ?? 0);
+      return 0;
+    });
+
+    return list;
+  }, [missions, searchQuery, selectedFilters, sortBy]);
 
   const handleMakeOffer = (mission: Mission) => {
     if (!user) {
@@ -135,6 +179,56 @@ export default function MarketplaceScreenComplete({ navigation }: any) {
     );
   };
 
+  const toggleFavorite = (missionId: string) => {
+    setFavorites(prev => {
+      const next = new Set(prev);
+      if (next.has(missionId)) next.delete(missionId); else next.add(missionId);
+      return next;
+    });
+  };
+
+  const openDetails = (mission: Mission) => {
+    setDetailsMission(mission);
+    setCustomPrice(String(mission.prix_propose || ''));
+    setCustomMessage(`Bonjour, je suis intéressé par la mission "${mission.titre}".`);
+    setDetailsModalVisible(true);
+  };
+
+  const submitCustomOffer = async () => {
+    if (!detailsMission) return;
+    if (!user) {
+      Alert.alert('Connexion requise', 'Veuillez vous connecter pour envoyer une offre.');
+      return;
+    }
+    const priceValue = Number(customPrice);
+    if (!Number.isFinite(priceValue) || priceValue <= 0) {
+      Alert.alert('Montant invalide', 'Veuillez saisir un montant valide.');
+      return;
+    }
+    try {
+      const { error } = await supabase.from('marketplace_devis').insert({
+        mission_id: detailsMission.id,
+        convoyeur_id: user.id,
+        prix_propose: priceValue,
+        message: customMessage?.slice(0, 500) || null,
+      });
+      if (error) throw error;
+      Alert.alert('Offre envoyée', 'Votre proposition a été transmise.');
+      setDetailsModalVisible(false);
+    } catch (e: any) {
+      Alert.alert('Erreur', e.message || "Impossible d'envoyer l'offre");
+    }
+  };
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    try {
+      await refetch();
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
   if (loading) {
     return (
       <SafeAreaView style={styles.container}>
@@ -165,18 +259,18 @@ export default function MarketplaceScreenComplete({ navigation }: any) {
           </View>
 
           <View style={styles.headerActions}>
-            <TouchableOpacity style={styles.iconButton}>
+            <TouchableOpacity style={styles.iconButton} onPress={() => nav.navigate('Notifications')}>
               <Feather name="bell" size={20} color="#d1d5db" />
               <View style={styles.notificationBadge}>
                 <Text style={styles.notificationText}>3</Text>
               </View>
             </TouchableOpacity>
             
-            <TouchableOpacity style={styles.iconButton}>
+            <TouchableOpacity style={styles.iconButton} onPress={() => nav.navigate('MarketplaceMessages')}>
               <Feather name="message-circle" size={20} color="#d1d5db" />
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.profileButton}>
+            <TouchableOpacity style={styles.profileButton} onPress={() => nav.navigate('Profile')}>
               <LinearGradient 
                 colors={['#06b6d4', '#0891b2']} 
                 style={styles.profileIcon}
@@ -191,99 +285,130 @@ export default function MarketplaceScreenComplete({ navigation }: any) {
       {/* Navigation Bar */}
       <View style={styles.navBar}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-          <TouchableOpacity style={[styles.navItem, styles.navItemActive]}>
+          <TouchableOpacity style={[styles.navItem, styles.navItemActive]} onPress={() => { /* Accueil: on reste ici */ }}>
             <Feather name="search" size={16} color="#06b6d4" />
             <Text style={[styles.navText, styles.navTextActive]}>Accueil</Text>
           </TouchableOpacity>
           
-          <TouchableOpacity style={styles.navItem}>
-            <Feather name="briefcase" size={16} color="#9ca3af" />
-            <Text style={styles.navText}>Toutes les missions</Text>
+          <TouchableOpacity style={styles.navItem} onPress={() => nav.navigate('ActiveMissions')}>
+            <Feather name="check-circle" size={16} color="#9ca3af" />
+            <Text style={styles.navText}>Missions actives</Text>
           </TouchableOpacity>
-          
-          <TouchableOpacity style={styles.navItem}>
-            <Feather name="user-check" size={16} color="#9ca3af" />
-            <Text style={styles.navText}>Mes offres</Text>
+
+          <TouchableOpacity style={styles.navItem} onPress={() => nav.navigate('MarketplaceMessages')}>
+            <Feather name="message-circle" size={16} color="#9ca3af" />
+            <Text style={styles.navText}>Messages</Text>
           </TouchableOpacity>
-          
-          <TouchableOpacity style={styles.navItem}>
-            <Feather name="activity" size={16} color="#9ca3af" />
-            <Text style={styles.navText}>Suivi</Text>
+
+          <TouchableOpacity style={styles.navItem} onPress={() => nav.navigate('Notifications')}>
+            <Feather name="bell" size={16} color="#9ca3af" />
+            <Text style={styles.navText}>Notifications</Text>
           </TouchableOpacity>
         </ScrollView>
       </View>
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {/* Search Bar */}
-        <View style={styles.searchContainer}>
-          <View style={styles.searchBar}>
-            <Feather name="search" size={20} color="#9ca3af" />
-            <TextInput
-              style={styles.searchInput}
-              placeholder="Rechercher par ville, type de véhicule..."
-              placeholderTextColor="#9ca3af"
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-            />
-            <TouchableOpacity 
-              style={styles.filterButton}
-              onPress={() => setFilterModalVisible(true)}
+      <FlatList
+        style={styles.content}
+        data={filteredMissions}
+        keyExtractor={(item) => item.id}
+        refreshing={refreshing}
+        onRefresh={onRefresh}
+        ListHeaderComponent={(
+          <>
+            {/* Search + Sort */}
+            <View style={styles.searchContainer}>
+              <View style={styles.searchBar}>
+                <Feather name="search" size={20} color="#9ca3af" />
+                <TextInput
+                  style={styles.searchInput}
+                  placeholder="Rechercher par ville, type de véhicule..."
+                  placeholderTextColor="#9ca3af"
+                  value={searchQuery}
+                  onChangeText={setSearchQuery}
+                />
+                <TouchableOpacity 
+                  style={styles.filterButton}
+                  onPress={() => setFilterModalVisible(true)}
+                >
+                  <Feather name="filter" size={18} color="#06b6d4" />
+                </TouchableOpacity>
+              </View>
+              <View style={styles.sortRow}>
+                <Text style={styles.sortLabel}>Trier:</Text>
+                <TouchableOpacity onPress={() => setSortBy('recent')} style={[styles.sortChip, sortBy==='recent' && styles.sortChipActive]}>
+                  <Text style={[styles.sortChipText, sortBy==='recent' && styles.sortChipTextActive]}>Récent</Text>
+                </TouchableOpacity>
+                <TouchableOpacity onPress={() => setSortBy('price_asc')} style={[styles.sortChip, sortBy==='price_asc' && styles.sortChipActive]}>
+                  <Text style={[styles.sortChipText, sortBy==='price_asc' && styles.sortChipTextActive]}>Prix ↑</Text>
+                </TouchableOpacity>
+                <TouchableOpacity onPress={() => setSortBy('price_desc')} style={[styles.sortChip, sortBy==='price_desc' && styles.sortChipActive]}>
+                  <Text style={[styles.sortChipText, sortBy==='price_desc' && styles.sortChipTextActive]}>Prix ↓</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            {/* Stats Section */}
+            <LinearGradient 
+              colors={['rgba(30, 41, 59, 0.3)', 'rgba(15, 23, 42, 0.3)']} 
+              style={styles.statsContainer}
             >
-              <Feather name="filter" size={18} color="#06b6d4" />
+              <Text style={styles.statsTitle}>Missions disponibles</Text>
+              <Text style={styles.statsSubtitle}>
+                Trouvez votre prochaine mission de convoyage
+              </Text>
+              
+              <View style={styles.statsGrid}>
+                <View style={styles.statItem}>
+                  <LinearGradient colors={['#06b6d4', '#0891b2']} style={styles.statIcon}>
+                    <Feather name="briefcase" size={16} color="white" />
+                  </LinearGradient>
+                  <Text style={styles.statValue}>{stats.totalMissions}</Text>
+                  <Text style={styles.statLabel}>Missions</Text>
+                </View>
+                
+                <View style={styles.statItem}>
+                  <LinearGradient colors={['#10b981', '#059669']} style={styles.statIcon}>
+                    <Feather name="users" size={16} color="white" />
+                  </LinearGradient>
+                  <Text style={styles.statValue}>{stats.convoyeurs}</Text>
+                  <Text style={styles.statLabel}>Convoyeurs</Text>
+                </View>
+                
+                <View style={styles.statItem}>
+                  <LinearGradient colors={['#f59e0b', '#d97706']} style={styles.statIcon}>
+                    <Feather name="star" size={16} color="white" />
+                  </LinearGradient>
+                  <Text style={styles.statValue}>{stats.averageRating}</Text>
+                  <Text style={styles.statLabel}>Note moyenne</Text>
+                </View>
+                
+                <View style={styles.statItem}>
+                  <LinearGradient colors={['#8b5cf6', '#7c3aed']} style={styles.statIcon}>
+                    <Feather name="trending-up" size={16} color="white" />
+                  </LinearGradient>
+                  <Text style={styles.statValue}>+12%</Text>
+                  <Text style={styles.statLabel}>Cette semaine</Text>
+                </View>
+              </View>
+            </LinearGradient>
+          </>
+        )}
+        ListEmptyComponent={(
+          <View style={styles.emptyState}>
+            <Feather name="search" size={48} color="#6b7280" />
+            <Text style={styles.emptyTitle}>Aucune mission trouvée</Text>
+            <Text style={styles.emptyDescription}>
+              Essayez de modifier vos critères de recherche
+            </Text>
+            <TouchableOpacity style={styles.refreshButton} onPress={onRefresh}>
+              <Text style={styles.refreshButtonText}>Actualiser</Text>
             </TouchableOpacity>
           </View>
-        </View>
-
-        {/* Stats Section */}
-        <LinearGradient 
-          colors={['rgba(30, 41, 59, 0.3)', 'rgba(15, 23, 42, 0.3)']} 
-          style={styles.statsContainer}
-        >
-          <Text style={styles.statsTitle}>Missions disponibles</Text>
-          <Text style={styles.statsSubtitle}>
-            Trouvez votre prochaine mission de convoyage
-          </Text>
-          
-          <View style={styles.statsGrid}>
-            <View style={styles.statItem}>
-              <LinearGradient colors={['#06b6d4', '#0891b2']} style={styles.statIcon}>
-                <Feather name="briefcase" size={16} color="white" />
-              </LinearGradient>
-              <Text style={styles.statValue}>{stats.totalMissions}</Text>
-              <Text style={styles.statLabel}>Missions</Text>
-            </View>
-            
-            <View style={styles.statItem}>
-              <LinearGradient colors={['#10b981', '#059669']} style={styles.statIcon}>
-                <Feather name="users" size={16} color="white" />
-              </LinearGradient>
-              <Text style={styles.statValue}>{stats.convoyeurs}</Text>
-              <Text style={styles.statLabel}>Convoyeurs</Text>
-            </View>
-            
-            <View style={styles.statItem}>
-              <LinearGradient colors={['#f59e0b', '#d97706']} style={styles.statIcon}>
-                <Feather name="star" size={16} color="white" />
-              </LinearGradient>
-              <Text style={styles.statValue}>{stats.averageRating}</Text>
-              <Text style={styles.statLabel}>Note moyenne</Text>
-            </View>
-            
-            <View style={styles.statItem}>
-              <LinearGradient colors={['#8b5cf6', '#7c3aed']} style={styles.statIcon}>
-                <Feather name="trending-up" size={16} color="white" />
-              </LinearGradient>
-              <Text style={styles.statValue}>+12%</Text>
-              <Text style={styles.statLabel}>Cette semaine</Text>
-            </View>
-          </View>
-        </LinearGradient>
-
-        {/* Mission List */}
-        <View style={styles.missionsList}>
-          {filteredMissions.map((mission) => (
+        )}
+        contentContainerStyle={filteredMissions.length === 0 ? { flexGrow: 1, justifyContent: 'center' } : undefined}
+        renderItem={({ item: mission }) => (
+          <View style={styles.missionsList}>
             <LinearGradient
-              key={mission.id}
               colors={['rgba(30, 41, 59, 0.5)', 'rgba(15, 23, 42, 0.3)']}
               style={styles.missionCard}
             >
@@ -298,8 +423,8 @@ export default function MarketplaceScreenComplete({ navigation }: any) {
                   </View>
                 </View>
                 
-                <TouchableOpacity style={styles.favoriteButton}>
-                  <Feather name="heart" size={18} color="#9ca3af" />
+                <TouchableOpacity style={styles.favoriteButton} onPress={() => toggleFavorite(mission.id)}>
+                  <Feather name={favorites.has(mission.id) ? 'heart' : 'heart'} size={18} color={favorites.has(mission.id) ? '#ef4444' : '#9ca3af'} />
                 </TouchableOpacity>
               </View>
 
@@ -349,7 +474,7 @@ export default function MarketplaceScreenComplete({ navigation }: any) {
                 </View>
                 
                 <View style={styles.actionButtons}>
-                  <TouchableOpacity style={styles.detailsButton}>
+                  <TouchableOpacity style={styles.detailsButton} onPress={() => openDetails(mission)}>
                     <Text style={styles.detailsButtonText}>Détails</Text>
                   </TouchableOpacity>
                   
@@ -365,22 +490,9 @@ export default function MarketplaceScreenComplete({ navigation }: any) {
                 </View>
               </View>
             </LinearGradient>
-          ))}
-        </View>
-
-        {filteredMissions.length === 0 && (
-          <View style={styles.emptyState}>
-            <Feather name="search" size={48} color="#6b7280" />
-            <Text style={styles.emptyTitle}>Aucune mission trouvée</Text>
-            <Text style={styles.emptyDescription}>
-              Essayez de modifier vos critères de recherche
-            </Text>
-            <TouchableOpacity style={styles.refreshButton}>
-              <Text style={styles.refreshButtonText}>Actualiser</Text>
-            </TouchableOpacity>
           </View>
         )}
-      </ScrollView>
+      />
 
       {/* Filter Modal */}
       <Modal
@@ -399,6 +511,7 @@ export default function MarketplaceScreenComplete({ navigation }: any) {
             </View>
             
             <ScrollView style={styles.filterOptions}>
+              <Text style={styles.filterGroupLabel}>Villes</Text>
               {filterOptions.map((filter) => (
                 <TouchableOpacity
                   key={filter}
@@ -435,6 +548,90 @@ export default function MarketplaceScreenComplete({ navigation }: any) {
               >
                 <LinearGradient colors={['#06b6d4', '#0891b2']} style={styles.applyButtonGradient}>
                   <Text style={styles.applyButtonText}>Appliquer</Text>
+                </LinearGradient>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Details Modal */}
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={detailsModalVisible}
+        onRequestClose={() => setDetailsModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.detailsModal}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Détails de la mission</Text>
+              <TouchableOpacity onPress={() => setDetailsModalVisible(false)}>
+                <Feather name="x" size={24} color="#9ca3af" />
+              </TouchableOpacity>
+            </View>
+
+            {detailsMission && (
+              <ScrollView style={{ paddingHorizontal: 24 }}>
+                <Text style={styles.detailsTitle}>{detailsMission.titre}</Text>
+                <View style={[styles.routeContainer, { marginHorizontal: 0 }]}>
+                  <View style={styles.routeItem}>
+                    <MaterialCommunityIcons name="map-marker" size={16} color="#10b981" />
+                    <Text style={styles.routeText}>{detailsMission.ville_depart}</Text>
+                  </View>
+                  <View style={styles.routeArrow}>
+                    <Feather name="arrow-right" size={16} color="#06b6d4" />
+                  </View>
+                  <View style={styles.routeItem}>
+                    <MaterialCommunityIcons name="map-marker-check" size={16} color="#ef4444" />
+                    <Text style={styles.routeText}>{detailsMission.ville_arrivee}</Text>
+                  </View>
+                </View>
+
+                <View style={{ gap: 8, marginBottom: 16 }}>
+                  <Text style={styles.detailText}>Date: {new Date(detailsMission.date_mission).toLocaleDateString('fr-FR')}</Text>
+                  {detailsMission.vehicule_requis && (
+                    <Text style={styles.detailText}>Véhicule: {detailsMission.vehicule_requis}</Text>
+                  )}
+                  {!!detailsMission.description && (
+                    <Text style={styles.detailText}>Description: {detailsMission.description}</Text>
+                  )}
+                </View>
+
+                <View style={styles.offerEditor}>
+                  <Text style={styles.offerEditorLabel}>Votre offre (€)</Text>
+                  <TextInput
+                    keyboardType="numeric"
+                    placeholder="Montant"
+                    placeholderTextColor="#9ca3af"
+                    style={styles.offerInput}
+                    value={customPrice}
+                    onChangeText={setCustomPrice}
+                  />
+                  <Text style={[styles.offerEditorLabel, { marginTop: 12 }]}>Message</Text>
+                  <TextInput
+                    placeholder="Ajoutez un message"
+                    placeholderTextColor="#9ca3af"
+                    style={[styles.offerInput, { height: 90, textAlignVertical: 'top' }]}
+                    value={customMessage}
+                    onChangeText={setCustomMessage}
+                    multiline
+                    maxLength={500}
+                  />
+                </View>
+              </ScrollView>
+            )}
+
+            <View style={styles.modalActions}>
+              <TouchableOpacity 
+                style={styles.clearButton}
+                onPress={() => setDetailsModalVisible(false)}
+              >
+                <Text style={styles.clearButtonText}>Annuler</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.applyButton} onPress={submitCustomOffer}>
+                <LinearGradient colors={['#06b6d4', '#0891b2']} style={styles.applyButtonGradient}>
+                  <Text style={styles.applyButtonText}>Envoyer l'offre</Text>
                 </LinearGradient>
               </TouchableOpacity>
             </View>
@@ -899,6 +1096,73 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 16,
     fontWeight: 'bold',
+  },
+  // Sort controls
+  sortRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 12,
+  },
+  sortLabel: {
+    color: '#9ca3af',
+    marginRight: 8,
+  },
+  sortChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(156, 163, 175, 0.5)',
+    marginRight: 8,
+  },
+  sortChipActive: {
+    backgroundColor: 'rgba(6, 182, 212, 0.2)',
+    borderColor: 'rgba(6, 182, 212, 0.6)',
+  },
+  sortChipText: {
+    color: '#d1d5db',
+    fontSize: 13,
+  },
+  sortChipTextActive: {
+    color: '#06b6d4',
+    fontWeight: '600',
+  },
+  filterGroupLabel: {
+    color: '#9ca3af',
+    fontSize: 12,
+    marginBottom: 8,
+  },
+  // Details modal styles
+  detailsModal: {
+    backgroundColor: '#1f2937',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingTop: 24,
+    maxHeight: '85%',
+  },
+  detailsTitle: {
+    color: 'white',
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 12,
+  },
+  offerEditor: {
+    marginTop: 8,
+    marginBottom: 16,
+  },
+  offerEditorLabel: {
+    color: '#d1d5db',
+    fontSize: 14,
+    marginBottom: 6,
+  },
+  offerInput: {
+    backgroundColor: 'rgba(55, 65, 81, 0.5)',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(75, 85, 99, 0.6)',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    color: 'white',
   },
   fab: {
     position: 'absolute',

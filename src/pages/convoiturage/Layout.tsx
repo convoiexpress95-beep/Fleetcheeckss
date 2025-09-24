@@ -30,9 +30,6 @@ export default function ConvoiturageLayout({ children }: PropsWithChildren) {
             <Button asChild variant={isActive('/convoiturage/messages') ? 'default' : 'outline'} size="sm">
               <Link to="/convoiturage/messages">Messages</Link>
             </Button>
-            <Button asChild variant={isActive('/convoiturage/profile') ? 'default' : 'outline'} size="sm">
-              <Link to="/convoiturage/profile">Profil</Link>
-            </Button>
           </nav>
         </div>
       </header>

@@ -89,11 +89,9 @@ export const useNativePushNotifications = () => {
         .upsert({
           user_id: user.id,
           token,
-          device_type: platform,
-          device_info: {
-            platform,
-            isNative,
-          },
+          platform,
+          is_active: true,
+          updated_at: new Date().toISOString(),
         });
 
       if (error) {

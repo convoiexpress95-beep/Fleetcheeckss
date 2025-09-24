@@ -52,8 +52,8 @@ export function useInspectionMissions() {
       const { data, error } = await supabase
         .from('missions')
         .select('*')
-        .eq('driver_id', user.id)
-        .eq('kind', 'inspection')
+        // Show missions where the user is involved as driver, creator, or donor
+        .or(`driver_id.eq.${user.id},created_by.eq.${user.id},donor_id.eq.${user.id}`)
         .order('created_at', { ascending: false });
 
       if (error) throw error;

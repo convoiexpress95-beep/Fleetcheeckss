@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   ScrollView,
   Alert,
+  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../contexts/AuthContext';
@@ -158,7 +159,7 @@ export const SettingsScreen: React.FC = () => {
       <View style={styles.debugSection}>
         <Text style={styles.debugTitle}>Informations techniques</Text>
         <Text style={styles.debugText}>Version: {Constants.expoConfig?.version}</Text>
-        <Text style={styles.debugText}>Build: {Constants.expoConfig?.runtimeVersion}</Text>
+  <Text style={styles.debugText}>Build: {String((Constants.expoConfig as any)?.runtimeVersion ?? '')}</Text>
         <Text style={styles.debugText}>Platform: {Constants.platform?.ios ? 'iOS' : 'Android'}</Text>
       </View>
     </ScrollView>

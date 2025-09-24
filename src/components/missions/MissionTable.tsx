@@ -7,12 +7,16 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { ALLOW_STATUS_CHANGE } from '@/lib/mission-policy';
 import { MoreHorizontal } from 'lucide-react';
 import { getMissionStatusStyle } from '@/lib/mission-status-colors';
+import React from 'react';
+import { AssignMissionDialog } from '@/components/AssignMissionDialog';
 
 type UiStatus = 'En attente'|'En cours'|'En retard'|'Livrée'|'Annulée';
 interface Props { missions: SupabaseMission[]; onStatusChange?: (id:string, s:UiStatus)=>void; onExportCsv?: ()=>void; onRemove?: (id:string)=>void; sortField?: string; sortDir?: string; onToggleSort?: (field:'created_at'|'updated_at'|'statut')=>void }
 const ALL_STATUSES: UiStatus[] = ['En attente','En cours','En retard','Livrée','Annulée'];
 export const MissionTable: React.FC<Props> = ({ missions, onStatusChange, onExportCsv, onRemove, sortField, sortDir, onToggleSort }) => {
   const navigate = useNavigate();
+  const [assignOpen, setAssignOpen] = React.useState(false);
+  const [selectedMission, setSelectedMission] = React.useState<SupabaseMission | null>(null);
   return (
     <div className="glass-card rounded-xl overflow-hidden relative group">
       <div className="flex justify-between items-center px-3 py-2 border-b border-white/10 backdrop-blur-sm bg-white/5">
@@ -85,6 +89,7 @@ export const MissionTable: React.FC<Props> = ({ missions, onStatusChange, onExpo
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
                     <DropdownMenuItem onClick={()=>navigate(`/missions/${m.id}`)}>Ouvrir</DropdownMenuItem>
+                    <DropdownMenuItem onClick={()=>{ setSelectedMission(m); setAssignOpen(true); }}>Assigner</DropdownMenuItem>
                     <DropdownMenuItem onClick={()=>onRemove && onRemove(m.id)}>Supprimer</DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
@@ -99,6 +104,7 @@ export const MissionTable: React.FC<Props> = ({ missions, onStatusChange, onExpo
         </TableBody>
       </Table>
       </div>
+      <AssignMissionDialog mission={selectedMission as any} open={assignOpen} onOpenChange={(o)=>{ setAssignOpen(o); if(!o) setSelectedMission(null); }} />
     </div>
   );
 };

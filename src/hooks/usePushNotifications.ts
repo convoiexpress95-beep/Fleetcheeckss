@@ -90,11 +90,9 @@ export const usePushNotifications = () => {
         .upsert({
           user_id: user.id,
           token,
-          device_type: 'web',
-          device_info: {
-            userAgent: navigator.userAgent,
-            platform: navigator.platform,
-          },
+          platform: 'web',
+          is_active: true,
+          updated_at: new Date().toISOString(),
         });
 
       if (error) {

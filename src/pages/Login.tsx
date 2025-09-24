@@ -10,7 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Truck, Sparkles, Lock, Mail, User, ArrowLeft, Briefcase, UserCheck, Shield } from 'lucide-react';
 
 const Login = () => {
-  const { signIn, signUp, user } = useAuth();
+  const { signIn, signUp, signInWithGoogle, user } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   
@@ -171,6 +171,18 @@ const Login = () => {
                         Se connecter
                       </>
                     )}
+                  </Button>
+                  <div className="relative my-3">
+                    <div className="absolute inset-0 flex items-center">
+                      <span className="w-full border-t border-white/10" />
+                    </div>
+                    <div className="relative flex justify-center text-xs uppercase">
+                      <span className="bg-background px-2 text-muted-foreground">ou</span>
+                    </div>
+                  </div>
+                  <Button type="button" variant="outline" className="w-full glass-card" onClick={signInWithGoogle}>
+                    <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" className="w-5 h-5 mr-2" />
+                    Continuer avec Google
                   </Button>
                 </form>
               </TabsContent>

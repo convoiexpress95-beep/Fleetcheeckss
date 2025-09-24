@@ -33,15 +33,36 @@ const Index = () => {
 
   const fetchMissions = async () => {
     try {
-      const { data, error } = await supabase
-        .from('marketplace_missions')
-        .select('*')
-        .eq('statut', 'ouverte')
-        .order('created_at', { ascending: false });
+      // Préférence: table de base, sinon fallback vers la vue
+      let rows: any[] = [];
+      let err: any | null = null;
+      try {
+        const { data, error } = await supabase
+          .from('fleetmarket_missions' as any)
+          .select('*')
+          .eq('statut', 'ouverte')
+          .order('created_at', { ascending: false });
+        rows = data || [];
+        err = error || null;
+      } catch (e: any) {
+        err = e;
+      }
+      if (err) {
+        const msg = String(err?.message || err?.error || '').toLowerCase();
+        if (msg.includes('relation') && msg.includes('does not exist') || msg.includes('not exist') || msg.includes('undefined table')) {
+          const { data, error } = await supabase
+            .from('marketplace_missions' as any)
+            .select('*')
+            .eq('statut', 'ouverte')
+            .order('created_at', { ascending: false });
+          if (error) throw error;
+          rows = data || [];
+        } else {
+          throw err;
+        }
+      }
 
-      if (error) throw error;
-      
-      const formattedMissions = (data || []).map((mission: any) => ({
+      const formattedMissions = rows.map((mission: any) => ({
         id: mission.id,
         departure: mission.ville_depart,
         arrival: mission.ville_arrivee,
@@ -244,7 +265,7 @@ const Index = () => {
                   Modifiez vos critères de recherche ou créez une alerte pour être notifié des nouvelles opportunités
                 </p>
                 <div className="space-y-4">
-                  <PublishMissionDialog />
+                  <PublishMissionDialog onCreated={fetchMissions} />
                   <Button 
                     onClick={handleCreateAlert}
                     variant="outline" 

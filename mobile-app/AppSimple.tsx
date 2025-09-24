@@ -8,7 +8,7 @@ import CovoiturageScreenSimple from './src/screens/CovoiturageScreenSimple';
 import MarketplaceScreenSimple from './src/screens/MarketplaceScreenSimple';
 import FacturationScreenSimple from './src/screens/FacturationScreenSimple';
 
-const Tab = createBottomTabNavigator();
+const Tab = createBottomTabNavigator<any>();
 
 // Écrans de base pour les fonctionnalités non encore implémentées
 const FleetScreen = () => (
@@ -29,6 +29,7 @@ export default function AppSimple() {
   return (
     <NavigationContainer>
       <Tab.Navigator
+        id={undefined}
         screenOptions={{
           tabBarActiveTintColor: '#2563eb',
           tabBarInactiveTintColor: '#6b7280',

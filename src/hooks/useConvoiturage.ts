@@ -155,9 +155,9 @@ export function useConvoiturage(search?: SearchParams) {
   const { data, error } = await supabase.from('ride_reservations').insert({
       ride_id: rideId,
       passenger_id: user.id,
-      seats,
+      seats_reserved: seats,
       status: 'pending',
-      price_at_booking: ride.price * seats,
+      total_price: ride.price * seats,
       message: message ?? null,
     }).select('*').single();
   if (error) throw error;

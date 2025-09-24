@@ -18,6 +18,8 @@ export interface Mission {
   vehicle_brand?: string;
   vehicle_model?: string;
   vehicle_year?: number;
+  created_at?: string;
+  updated_at?: string;
 }
 
 // Nouveaux types pour les fonctionnalités ajoutées

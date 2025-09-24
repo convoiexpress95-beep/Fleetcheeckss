@@ -92,6 +92,10 @@ export interface Quote {
   notes?: string;
   legal_mentions?: string;
   items?: QuoteItem[];
+  // Champs additionnels alignés sur le schéma DB (facultatifs côté app)
+  mission_id?: string | null;
+  provider_id?: string | null;
+  amount?: number | null;
 }
 
 export const useBilling = () => {
@@ -381,18 +385,23 @@ export const useBilling = () => {
       const { data, error } = await supabase
         .from('quotes')
         .insert({
-          client_id: quoteData.client_id!,
+          // champs requis par le schéma
+          amount: quoteData.total_ttc || 0,
+          mission_id: quoteData.mission_id || '00000000-0000-0000-0000-000000000000',
+          provider_id: user.id,
+          // autres champs
+          client_id: quoteData.client_id ?? null,
           user_id: user.id,
           quote_number: quoteNumber,
           quote_date: quoteData.quote_date || new Date().toISOString().split('T')[0],
-          validity_date: quoteData.validity_date!,
-          subtotal_ht: quoteData.subtotal_ht || 0,
-          vat_rate: quoteData.vat_rate ?? 20,
-          vat_amount: quoteData.vat_amount || 0,
-          total_ttc: quoteData.total_ttc || 0,
-          payment_terms: quoteData.payment_terms,
-          payment_method: quoteData.payment_method,
-          notes: quoteData.notes,
+          validity_date: quoteData.validity_date ?? null,
+          subtotal_ht: quoteData.subtotal_ht ?? null,
+          vat_rate: quoteData.vat_rate ?? null,
+          vat_amount: quoteData.vat_amount ?? null,
+          total_ttc: quoteData.total_ttc ?? null,
+          payment_terms: quoteData.payment_terms ?? null,
+          payment_method: quoteData.payment_method ?? null,
+          notes: quoteData.notes ?? null,
           legal_mentions:
             quoteData.legal_mentions ||
             "Devis valable jusqu'à la date indiquée. Les prix sont exprimés HT et TTC. Travaux/prestations réalisés après acceptation et signature du devis.",

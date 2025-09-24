@@ -119,13 +119,13 @@ async function resolveTableName(): Promise<'fleetmarket_missions' | 'marketplace
 export async function listMissions(): Promise<FleetMarketMission[]> {
   try {
     const table = await resolveTableName();
-    const { data, error } = await supabase
+    const { data, error } = await (supabase as any)
       .from(table)
       .select('*')
       .order('created_at', { ascending: false })
       .limit(100);
     if (error) throw error;
-    return (data || []).map(mapRow);
+    return ((data || []) as FleetRowSelect[]).map(mapRow);
   } catch (e) {
     console.warn('[FleetMarket] fallback mémoire listMissions', e);
     return memory;
@@ -147,7 +147,7 @@ export async function publishMission(partial: Omit<FleetMarketMission,'id'|'stat
     statut: 'ouverte'
   };
   const table = await resolveTableName();
-  const { data, error } = await supabase
+  const { data, error } = await (supabase as any)
     .from(table)
     .insert(row)
     .select('*')
@@ -167,7 +167,7 @@ export async function publishMission(partial: Omit<FleetMarketMission,'id'|'stat
 export async function updateMissionStatus(id: string, statut: 'ouverte'|'en_negociation'|'attribuee'|'terminee'|'annulee') {
   try {
     const table = await resolveTableName();
-    const { data, error } = await supabase
+    const { data, error } = await (supabase as any)
       .from(table)
       .update({ statut })
       .eq('id', id)
@@ -176,7 +176,7 @@ export async function updateMissionStatus(id: string, statut: 'ouverte'|'en_nego
     if (error) throw error;
     // sync mémoire
   memory = memory.map(m => m.id === id ? { ...m, statut } : m);
-    return mapRow(data);
+  return mapRow(data as FleetRowSelect);
   } catch (e) {
     console.warn('[FleetMarket] fallback mémoire updateMissionStatus', e);
   memory = memory.map(m => m.id === id ? { ...m, statut } : m);
@@ -187,7 +187,7 @@ export async function updateMissionStatus(id: string, statut: 'ouverte'|'en_nego
 export async function assignMission(id: string, convoyeurUserId: string) {
   try {
     const table = await resolveTableName();
-    const { data, error } = await supabase
+    const { data, error } = await (supabase as any)
       .from(table)
       .update({ statut: 'attribuee', convoyeur_id: convoyeurUserId })
       .eq('id', id)
@@ -195,7 +195,7 @@ export async function assignMission(id: string, convoyeurUserId: string) {
       .single();
     if (error) throw error;
   memory = memory.map(m => m.id === id ? { ...m, statut: 'attribuee', convoyeur_id: convoyeurUserId } : m);
-    return mapRow(data);
+  return mapRow(data as FleetRowSelect);
   } catch (e) {
     console.warn('[FleetMarket] fallback mémoire assignMission', e);
   memory = memory.map(m => m.id === id ? { ...m, statut: 'attribuee', convoyeur_id: convoyeurUserId } : m);

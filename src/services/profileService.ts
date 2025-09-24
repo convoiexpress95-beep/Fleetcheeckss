@@ -33,69 +33,29 @@ export class ProfileService {
     }
 
     try {
-      // Version simplifiée : aller directement à l'approche manuelle INSERT/UPDATE
-      // On contourne temporairement la RPC pour diagnostiquer
-      console.log('ProfileService: Démarrage approche directe INSERT/UPDATE...');
+      // Utiliser la fonction RPC upsert_profile qui gère les conflits RLS proprement
+      console.log('ProfileService: Utilisation de la fonction RPC upsert_profile...');
       
-      // Stratégie: Essayer INSERT d'abord, puis UPDATE si conflit
-      console.log('ProfileService: Tentative INSERT...');
-        const insertRes = await instrumentProfilesQuery('insert-profile', async () =>
-          await supabase
-            .from('profiles')
-            .insert({
-              user_id: profile.user_id,
-              email: profile.email,
-              full_name: profile.full_name,
-              phone: profile.phone,
-              avatar_url: profile.avatar_url,
-              display_name: profile.display_name,
-              bio: profile.bio,
-              location: profile.location
-            })
-            .select('user_id')
-            .single()
-        );
-        const { data: insertData, error: insertError } = insertRes || {} as any;
+      // Cast en any temporairement pour éviter le problème de types TypeScript
+      const { data, error } = await (supabase as any).rpc('upsert_profile', {
+        _user_id: profile.user_id,
+        _email: profile.email,
+        _full_name: profile.full_name,
+        _phone: profile.phone || null,
+        _avatar_url: profile.avatar_url || null,
+        _display_name: profile.display_name || null,
+        _bio: profile.bio || null,
+        _location: profile.location || null
+      });
 
-      if (!insertError && insertData) {
-        console.log('ProfileService: INSERT réussi directement:', insertData);
-        this.processedUsers.add(profile.user_id);
-        return true;
+      if (error) {
+        console.error('ProfileService: Erreur RPC upsert_profile:', error);
+        return false;
       }
 
-      // Si INSERT échoue, essayer UPDATE
-      if (insertError) {
-        console.log('ProfileService: INSERT échoué, tentative UPDATE:', insertError.message);
-          const updateRes = await instrumentProfilesQuery('update-profile', async () =>
-            await supabase
-              .from('profiles')
-              .update({
-                email: profile.email,
-                full_name: profile.full_name,
-                phone: profile.phone,
-                avatar_url: profile.avatar_url,
-                display_name: profile.display_name,
-                bio: profile.bio,
-                location: profile.location,
-                updated_at: new Date().toISOString()
-              })
-              .eq('user_id', profile.user_id)
-              .select('user_id')
-              .single()
-          );
-          const { data: updateData, error: updateError } = updateRes || {} as any;
-
-        if (!updateError && updateData) {
-          console.log('ProfileService: UPDATE réussi:', updateData);
-          this.processedUsers.add(profile.user_id);
-          return true;
-        } else {
-          console.error('ProfileService: UPDATE aussi échoué:', updateError);
-          return false;
-        }
-      }
-
-      return false;
+      console.log('ProfileService: RPC upsert_profile réussi:', data);
+      this.processedUsers.add(profile.user_id);
+      return true;
     } catch (error: any) {
       console.error('ProfileService.safeUpsertProfile exception globale:', error.message, error);
       return false;

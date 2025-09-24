@@ -10,6 +10,7 @@ interface AuthContextType {
   loading: boolean;
   signIn: (email: string, password: string) => Promise<{ error?: any }>;
   signUp: (email: string, password: string, fullName: string) => Promise<{ error?: any }>;
+  signInWithGoogle: () => Promise<{ error?: any }>;
   signOut: () => Promise<void>;
 }
 
@@ -204,12 +205,29 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     }
   };
 
+  const signInWithGoogle = async () => {
+    try {
+      const redirectTo = `${window.location.origin}/auth/callback`;
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: { redirectTo }
+      });
+      if (error) return { error };
+      // On web, Supabase will redirect automatically
+      return {};
+    } catch (error: unknown) {
+      console.error('Google sign-in error:', error);
+      return { error } as { error?: unknown };
+    }
+  };
+
   const value = {
     user,
     session,
     loading,
     signIn,
     signUp,
+    signInWithGoogle,
     signOut,
   };
 

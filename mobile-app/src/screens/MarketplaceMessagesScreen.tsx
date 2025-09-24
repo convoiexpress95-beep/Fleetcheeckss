@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -12,6 +12,9 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
+import Toast from 'react-native-toast-message';
+import { supabase } from '../config/supabase';
+import { useAuth } from '../contexts/AuthContext';
 
 interface Conversation {
   id: string;
@@ -40,119 +43,170 @@ interface Message {
 }
 
 export default function MarketplaceMessagesScreen({ navigation }: any) {
+  const { user } = useAuth();
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [selectedConversation, setSelectedConversation] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [messageText, setMessageText] = useState('');
   const [loading, setLoading] = useState(true);
+  const listRef = useRef<FlatList<Message>>(null);
 
-  // Mock data
+  const isAuthenticated = !!user?.id;
+
+  // Load conversations for current user
   useEffect(() => {
-    const mockConversations: Conversation[] = [
-      {
-        id: '1',
-        participant: {
-          name: 'BMW Concession Paris',
-          company: 'BMW France',
-        },
-        lastMessage: {
-          content: 'Parfait, merci pour votre offre. Nous validons le transport pour demain.',
-          timestamp: '2025-09-18T14:30:00Z',
-          isRead: false
-        },
-        unreadCount: 2,
-        missionTitle: 'Transport BMW X3 - Paris vers Lyon'
-      },
-      {
-        id: '2',
-        participant: {
-          name: 'Mercedes Elite',
-          company: 'Mercedes-Benz',
-        },
-        lastMessage: {
-          content: 'Le véhicule est prêt pour la prise en charge.',
-          timestamp: '2025-09-18T11:15:00Z',
-          isRead: true
-        },
-        unreadCount: 0,
-        missionTitle: 'Livraison Mercedes - Marseille vers Nice'
-      },
-      {
-        id: '3',
-        participant: {
-          name: 'Jean Dupont',
-          company: 'Convoyeur',
-        },
-        lastMessage: {
-          content: 'Je suis disponible pour cette mission, quel est votre tarif ?',
-          timestamp: '2025-09-17T16:45:00Z',
-          isRead: true
-        },
-        unreadCount: 0,
-        missionTitle: 'Convoyage Audi A6 - Toulouse vers Bordeaux'
+    let cancelled = false;
+    const fetchConversations = async () => {
+      if (!user?.id) {
+        setConversations([]);
+        setLoading(false);
+        return;
       }
-    ];
+      try {
+        setLoading(true);
+        // Get conversations where user is owner or convoyeur
+        const { data: convs, error: convErr } = await supabase
+          .from('conversations')
+          .select('id, mission_id, owner_id, convoyeur_id, last_message, updated_at')
+          .or(`owner_id.eq.${user.id},convoyeur_id.eq.${user.id}`)
+          .order('updated_at', { ascending: false });
+        if (convErr) throw convErr;
 
-    setTimeout(() => {
-      setConversations(mockConversations);
-      setLoading(false);
-    }, 1000);
-  }, []);
+        const missionIds = Array.from(new Set((convs || []).map((c: any) => c.mission_id).filter(Boolean)));
+        const userIds = Array.from(new Set((convs || []).flatMap((c: any) => [c.owner_id, c.convoyeur_id])));
 
-  const loadMessages = (conversationId: string) => {
-    const mockMessages: Message[] = [
-      {
-        id: '1',
-        content: 'Bonjour, je suis intéressé par votre mission de transport.',
-        timestamp: '2025-09-18T10:00:00Z',
-        senderId: 'user1',
-        senderName: 'Vous',
-        isCurrentUser: true
-      },
-      {
-        id: '2',
-        content: 'Parfait ! Pouvez-vous me confirmer votre disponibilité pour demain ?',
-        timestamp: '2025-09-18T10:15:00Z',
-        senderId: 'client1',
-        senderName: 'BMW Concession Paris',
-        isCurrentUser: false
-      },
-      {
-        id: '3',
-        content: 'Oui, je suis disponible. Je peux prendre en charge le véhicule à 9h.',
-        timestamp: '2025-09-18T10:30:00Z',
-        senderId: 'user1',
-        senderName: 'Vous',
-        isCurrentUser: true
-      },
-      {
-        id: '4',
-        content: 'Parfait, merci pour votre offre. Nous validons le transport pour demain.',
-        timestamp: '2025-09-18T14:30:00Z',
-        senderId: 'client1',
-        senderName: 'BMW Concession Paris',
-        isCurrentUser: false
+        // Load mission titles
+        const [{ data: missions }, { data: profiles }] = await Promise.all([
+          missionIds.length
+            ? supabase
+                .from('marketplace_missions')
+                .select('id, title')
+                .in('id', missionIds)
+            : Promise.resolve({ data: [] as any[] }),
+          userIds.length
+            ? supabase
+                .from('profiles')
+                .select('id, display_name')
+                .in('id', userIds)
+            : Promise.resolve({ data: [] as any[] }),
+        ]);
+
+        const missionMap = new Map<string, any>();
+        (missions || []).forEach((m: any) => missionMap.set(m.id, m));
+        const profileMap = new Map<string, any>();
+        (profiles || []).forEach((p: any) => profileMap.set(p.id, p));
+
+        const mapped: Conversation[] = (convs || []).map((c: any) => {
+          const otherId = c.owner_id === user.id ? c.convoyeur_id : c.owner_id;
+          const other = profileMap.get(otherId);
+          const mission = missionMap.get(c.mission_id);
+          return {
+            id: c.id,
+            participant: { name: other?.display_name || 'Contact' },
+            lastMessage: {
+              content: c.last_message || '',
+              timestamp: c.updated_at,
+              isRead: true,
+            },
+            unreadCount: 0,
+            missionTitle: mission?.title,
+          } as Conversation;
+        });
+
+        if (!cancelled) setConversations(mapped);
+      } catch (e: any) {
+        console.error('[marketplace] fetchConversations error:', e);
+        Toast.show({ type: 'error', text1: 'Erreur', text2: 'Chargement des conversations impossible.' });
+      } finally {
+        if (!cancelled) setLoading(false);
       }
-    ];
+    };
+    fetchConversations();
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.id]);
 
-    setMessages(mockMessages);
+  // Load messages for selected conversation + realtime subscribe
+  useEffect(() => {
+    let active = true;
+    let channel: ReturnType<typeof supabase.channel> | null = null;
+    const load = async () => {
+      if (!selectedConversation) {
+        setMessages([]);
+        return;
+      }
+      try {
+        const { data: rows, error } = await supabase
+          .from('messages')
+          .select('id, sender_id, content, created_at')
+          .eq('conversation_id', selectedConversation)
+          .order('created_at', { ascending: true });
+        if (error) throw error;
+        if (!active) return;
+        setMessages(
+          (rows || []).map((m: any) => ({
+            id: m.id,
+            content: m.content,
+            timestamp: m.created_at,
+            senderId: m.sender_id,
+            senderName: m.sender_id === user?.id ? 'Vous' : 'Contact',
+            isCurrentUser: m.sender_id === user?.id,
+          }))
+        );
+        // subscribe realtime
+        channel = supabase
+          .channel(`rt:messages:${selectedConversation}`)
+          .on(
+            'postgres_changes',
+            { event: 'INSERT', schema: 'public', table: 'messages', filter: `conversation_id=eq.${selectedConversation}` },
+            (payload: any) => {
+              const m = payload?.new;
+              if (!m) return;
+              setMessages((prev) => [
+                ...prev,
+                {
+                  id: m.id,
+                  content: m.content,
+                  timestamp: m.created_at,
+                  senderId: m.sender_id,
+                  senderName: m.sender_id === user?.id ? 'Vous' : 'Contact',
+                  isCurrentUser: m.sender_id === user?.id,
+                },
+              ]);
+              requestAnimationFrame(() => listRef.current?.scrollToEnd({ animated: true }));
+            }
+          )
+          .subscribe();
+      } catch (e: any) {
+        console.error('[marketplace] load messages error:', e);
+        Toast.show({ type: 'error', text1: 'Erreur', text2: 'Chargement des messages impossible.' });
+      }
+    };
+    load();
+    return () => {
+      active = false;
+      if (channel) supabase.removeChannel(channel);
+    };
+  }, [selectedConversation, user?.id]);
+
+  const loadMessages = async (conversationId: string) => {
     setSelectedConversation(conversationId);
   };
 
-  const sendMessage = () => {
-    if (!messageText.trim() || !selectedConversation) return;
-
-    const newMessage: Message = {
-      id: Date.now().toString(),
-      content: messageText.trim(),
-      timestamp: new Date().toISOString(),
-      senderId: 'user1',
-      senderName: 'Vous',
-      isCurrentUser: true
-    };
-
-    setMessages(prev => [...prev, newMessage]);
-    setMessageText('');
+  const sendMessage = async () => {
+    try {
+      const content = messageText.trim();
+      if (!content || !selectedConversation || !user?.id) return;
+      setMessageText('');
+      const { error } = await supabase
+        .from('messages')
+        .insert({ conversation_id: selectedConversation, sender_id: user.id, content });
+      if (error) throw error;
+    } catch (e: any) {
+      console.error('[marketplace] send message error:', e);
+      Toast.show({ type: 'error', text1: 'Erreur', text2: "Échec de l'envoi du message." });
+    }
   };
 
   const formatTime = (timestamp: string) => {
@@ -302,6 +356,7 @@ export default function MarketplaceMessagesScreen({ navigation }: any) {
             <FlatList
               data={messages}
               keyExtractor={(item) => item.id}
+              ref={listRef}
               style={styles.messagesList}
               showsVerticalScrollIndicator={false}
               renderItem={({ item }) => (

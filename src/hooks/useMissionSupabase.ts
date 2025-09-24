@@ -66,17 +66,29 @@ export function useMissionSupabase() {
   const loadMissions = useCallback(async () => {
     setLoading(true);
     try {
-      const { data, error } = await instrumentDbQuery('missions-select', () =>
+      // Essai 1: marketplace_missions (vue ou table)
+      const res1 = await instrumentDbQuery('missions-select', () =>
         supabase
           .from('marketplace_missions')
           .select('*')
           .order(sort.field, { ascending: sort.dir === 'asc' })
       );
 
-      if (error) throw error;
-      
-      if (RTC_DEBUG) console.log('[RTC] Missions loaded:', data);
-      setMissions(data || []);
+      if (res1.error) {
+        // Essai 2: fleetmarket_missions (table de base)
+        const res2 = await instrumentDbQuery('missions-select-fallback', () =>
+          supabase
+            .from('fleetmarket_missions')
+            .select('*')
+            .order(sort.field, { ascending: sort.dir === 'asc' })
+        );
+        if (res2.error) throw res2.error;
+        if (RTC_DEBUG) console.log('[RTC] Missions loaded (fallback fleetmarket):', res2.data);
+        setMissions(res2.data || []);
+      } else {
+        if (RTC_DEBUG) console.log('[RTC] Missions loaded:', res1.data);
+        setMissions(res1.data || []);
+      }
     } catch (error: any) {
       console.error('Error loading missions:', error);
       toast({
@@ -114,21 +126,32 @@ export function useMissionSupabase() {
     // Écouter les changements en temps réel
     const channel = supabase
       .channel('missions-realtime')
-      .on('postgres_changes', {
-        event: '*',
-        schema: 'public',
-        table: 'marketplace_missions'
-      }, (payload) => {
-        if (RTC_DEBUG) console.log('[RTC] Mission change:', payload);
-        
+      // Écoute sur la vue (si c'est une table en prod)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'marketplace_missions' }, (payload) => {
+        if (RTC_DEBUG) console.log('[RTC] marketplace_missions change:', payload);
         if (payload.eventType === 'INSERT') {
-          setMissions(prev => [payload.new as SupabaseMission, ...prev]);
+          setMissions(prev => {
+            const id = (payload.new as any).id;
+            return prev.some(m => m.id === id) ? prev : [payload.new as SupabaseMission, ...prev];
+          });
         } else if (payload.eventType === 'UPDATE') {
-          setMissions(prev => prev.map(mission => 
-            mission.id === payload.new.id ? { ...mission, ...payload.new } : mission
-          ));
+          setMissions(prev => prev.map(mission => mission.id === (payload.new as any).id ? { ...mission, ...(payload.new as any) } : mission));
         } else if (payload.eventType === 'DELETE') {
-          setMissions(prev => prev.filter(mission => mission.id !== payload.old.id));
+          setMissions(prev => prev.filter(mission => mission.id !== (payload.old as any).id));
+        }
+      })
+      // Écoute aussi sur la table réelle (cas courant: la vue marketplace_missions pointe vers cette table)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'fleetmarket_missions' }, (payload) => {
+        if (RTC_DEBUG) console.log('[RTC] fleetmarket_missions change:', payload);
+        if (payload.eventType === 'INSERT') {
+          setMissions(prev => {
+            const id = (payload.new as any).id;
+            return prev.some(m => m.id === id) ? prev : [payload.new as SupabaseMission, ...prev];
+          });
+        } else if (payload.eventType === 'UPDATE') {
+          setMissions(prev => prev.map(mission => mission.id === (payload.new as any).id ? { ...mission, ...(payload.new as any) } : mission));
+        } else if (payload.eventType === 'DELETE') {
+          setMissions(prev => prev.filter(mission => mission.id !== (payload.old as any).id));
         }
       })
       .subscribe();
@@ -177,9 +200,10 @@ export function useMissionSupabase() {
     if (!user) return;
 
     try {
+      // Insérer dans la table de base (fiable), la vue 'marketplace_missions' n'est pas insérable
       const { data, error } = await instrumentDbQuery('mission-insert', () =>
         supabase
-          .from('marketplace_missions')
+          .from('fleetmarket_missions')
           .insert([{ ...missionData, created_by: user.id, statut: missionData.statut || 'ouverte' }])
           .select()
           .single()
@@ -192,7 +216,16 @@ export function useMissionSupabase() {
         description: 'La mission a été créée avec succès'
       });
 
-      // Pas besoin de mettre à jour l'état, le realtime s'en charge
+      // Maj optimiste: ajoute immédiatement si le realtime n'est pas actif
+      if (data) {
+        setMissions(prev => {
+          const id = (data as any).id;
+          return prev.some(m => m.id === id) ? prev : [data as SupabaseMission, ...prev];
+        });
+      }
+
+      // Refetch de sécurité: garantit l'affichage même si le Realtime est désactivé
+      loadMissions();
     } catch (error: any) {
       console.error('Error creating mission:', error);
       toast({
@@ -201,7 +234,7 @@ export function useMissionSupabase() {
         variant: 'destructive'
       });
     }
-  }, [toast, user]);
+  }, [toast, user, loadMissions]);
 
   const updateMissionStatus = useCallback(async (id: string, statut: 'ouverte' | 'en_negociation' | 'attribuee' | 'terminee' | 'annulee') => {
     try {

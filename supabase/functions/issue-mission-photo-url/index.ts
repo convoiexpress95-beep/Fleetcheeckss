@@ -40,7 +40,7 @@ serve(async (req) => {
       return new Response(JSON.stringify({ error: 'Unauthorized' }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 401 });
     }
 
-    const admin = createClient(SUPA_URL, SERVICE_ROLE_KEY);
+  const admin = createClient(SUPA_URL, SERVICE_ROLE_KEY);
 
     // Verify participant
     const { data: mission, error: mErr } = await admin
@@ -62,6 +62,14 @@ serve(async (req) => {
     const path = `missions/${missionId}/${safeFolder}/${safeFilename}`;
 
     if (requestedAction === 'upload') {
+      // Ensure bucket exists (auto-create if missing)
+      try {
+        const { data: buckets } = await admin.storage.listBuckets();
+        const exists = buckets?.some((b: any) => b.name === 'mission-photos');
+        if (!exists) {
+          await admin.storage.createBucket('mission-photos', { public: false });
+        }
+      } catch (_) { /* ignore - will error out at createSignedUploadUrl if truly missing */ }
       // Create a signed upload URL/token valid for a short time.
       const { data: signed, error: sErr } = await admin.storage
         .from('mission-photos')

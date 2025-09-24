@@ -123,22 +123,34 @@ export const InspectionScreen: React.FC = () => {
     setUploading(true);
 
     try {
+      // Helper pour obtenir une URL signée d'upload depuis l'Edge Function
+      const getSignedUpload = async (
+        missionId: string,
+        folder: 'departure' | 'arrival' | 'receipts' | 'documents',
+        filename: string,
+        contentType: string
+      ) => {
+        const { data, error } = await supabase.functions.invoke('issue-mission-photo-url', {
+          body: { action: 'upload', missionId, folder, filename, contentType },
+        });
+        if (error || !data?.token || !data?.path) {
+          throw new Error((data as any)?.error || error?.message || 'Échec URL signée');
+        }
+        return data as { path: string; token: string };
+      };
+
       for (const photo of photos) {
-        // Créer un nom de fichier unique
+        const folder = photo.type === 'pickup' ? 'departure' : 'arrival';
         const fileName = `inspection_${selectedMission}_${photo.type}_${photo.id}.jpg`;
-        
-        // Lire le fichier
+        const { path, token } = await getSignedUpload(selectedMission, folder, fileName, 'image/jpeg');
+
+        // Lire le fichier puis uploader via l'URL signée
         const response = await fetch(photo.uri);
-        const blob = await response.blob();
-        
-        // Upload vers Supabase Storage
+        const ab = await response.arrayBuffer();
         const { error: uploadError } = await supabase.storage
           .from('mission-photos')
-          .upload(fileName, blob);
-
-        if (uploadError) {
-          throw uploadError;
-        }
+          .uploadToSignedUrl(path, token, ab, { contentType: 'image/jpeg' });
+        if (uploadError) throw uploadError;
 
         // Sauvegarder les métadonnées en base
         await supabase.from('mission_tracking').insert({

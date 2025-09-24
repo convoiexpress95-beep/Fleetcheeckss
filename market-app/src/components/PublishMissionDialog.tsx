@@ -12,7 +12,11 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 
-const PublishMissionDialog = () => {
+interface PublishMissionDialogProps {
+  onCreated?: () => void;
+}
+
+const PublishMissionDialog = ({ onCreated }: PublishMissionDialogProps) => {
   const [isOpen, setIsOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedBrand, setSelectedBrand] = useState<string>("all");
@@ -83,16 +87,37 @@ const PublishMissionDialog = () => {
         statut: 'ouverte'
       };
 
-      const { error } = await supabase
-        .from('marketplace_missions')
-        .insert(missionData);
+      // Tente l'insertion dans la table de base; fallback sur la vue si nécessaire
+      let insertError: any | null = null;
+      try {
+        const { error } = await supabase
+          .from('fleetmarket_missions' as any)
+          .insert(missionData as any);
+        insertError = error || null;
+      } catch (e: any) {
+        insertError = e;
+      }
 
-      if (error) throw error;
+      if (insertError) {
+        // Si la table n'existe pas ou n'est pas accessible, fallback vers l'ancienne relation
+        const msg = String(insertError?.message || insertError?.error || '').toLowerCase();
+        if (msg.includes('relation') && msg.includes('does not exist') || msg.includes('not exist') || msg.includes('undefined table')) {
+          const { error: fallbackErr } = await supabase
+            .from('marketplace_missions' as any)
+            .insert(missionData as any);
+          if (fallbackErr) throw fallbackErr;
+        } else {
+          // Cas d'erreur métier (ex: crédits insuffisants) ou autre
+          throw insertError;
+        }
+      }
 
       toast({
         title: "Mission publiée avec succès !",
         description: "Votre mission est maintenant visible par les convoyeurs",
       });
+      // Notifie le parent pour rafraîchir la liste
+      onCreated?.();
       
       setIsOpen(false);
       setFormData({
@@ -108,9 +133,14 @@ const PublishMissionDialog = () => {
       });
     } catch (error: any) {
       console.error('Erreur lors de la publication:', error);
+      const rawMsg = String(error?.message || error?.error || '');
+      const msg = rawMsg.toLowerCase();
+      const isCredit = msg.includes('credit') || msg.includes('insufficient') || msg.includes('solde') || msg.includes('wallet');
       toast({
-        title: "Erreur",
-        description: error.message || "Impossible de publier la mission",
+        title: isCredit ? "Crédits insuffisants" : "Erreur",
+        description: isCredit
+          ? "Votre portefeuille ne dispose pas d'assez de crédits pour publier une mission. Rendez-vous dans Facturation pour recharger."
+          : (rawMsg || "Impossible de publier la mission"),
         variant: "destructive",
       });
     } finally {

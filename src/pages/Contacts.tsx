@@ -86,14 +86,9 @@ const ContactsManager = () => {
           .order('full_name', { ascending: true });
 
         if (error) throw error;
-        
-        // Cast to Profile type with proper verification_status handling
-        const typedProfiles = (profiles || []).map(p => ({
-          ...p,
-          verification_status: (p.verification_status as 'pending' | 'approved' | 'rejected') || 'pending'
-        })) as Profile[];
-        
-        setAllProfiles(typedProfiles);
+
+        // Projection typée sans champs non existants (verification_status n'existe pas dans le schéma actuel)
+        setAllProfiles((profiles || []) as unknown as Profile[]);
       } catch (error) {
         console.error('Error loading profiles:', error);
       } finally {
@@ -144,8 +139,8 @@ const ContactsManager = () => {
       profile.location?.toLowerCase().includes(searchQuery.toLowerCase());
     
     const matchesStatus = selectedStatus === 'all' || 
-      (selectedStatus === 'verified' && profile.is_convoyeur_confirme) ||
-      (selectedStatus === 'pending' && profile.verification_status === 'pending');
+      (selectedStatus === 'verified' && !!profile.is_convoyeur_confirme) ||
+      (selectedStatus === 'pending' && !profile.is_convoyeur_confirme);
     
     return matchesSearch && matchesStatus;
   });

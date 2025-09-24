@@ -8,9 +8,9 @@ export interface Notification {
   title: string;
   message: string;
   type: 'info' | 'success' | 'warning' | 'error';
-  read: boolean;
+  metadata?: Record<string, any>;
+  read_at: string | null;
   created_at: string;
-  updated_at: string;
 }
 
 export const useNotifications = () => {
@@ -21,9 +21,18 @@ export const useNotifications = () => {
         .from("notifications")
         .select("*")
         .order("created_at", { ascending: false });
-      
       if (error) throw error;
-      return data as Notification[];
+      const rows = (data ?? []) as any[];
+      return rows.map((r) => ({
+        id: r.id,
+        user_id: r.user_id,
+        title: r.title,
+        message: r.message,
+        type: r.type,
+        metadata: r.metadata ?? {},
+        read_at: r.read_at ?? null,
+        created_at: r.created_at,
+      })) as Notification[];
     },
   });
 };
@@ -34,9 +43,8 @@ export const useUnreadNotificationsCount = () => {
     queryFn: async () => {
       const { count, error } = await supabase
         .from("notifications")
-        .select("*", { count: "exact", head: true })
-        .eq("read", false);
-      
+        .select("id", { count: "exact", head: true })
+        .is("read_at", null);
       if (error) throw error;
       return count || 0;
     },
@@ -49,19 +57,17 @@ export const useMarkNotificationAsRead = () => {
 
   return useMutation({
     mutationFn: async (notificationId: string) => {
-      const { error } = await supabase
-        .from("notifications")
-        .update({ read: true })
-        .eq("id", notificationId);
-      
+      // Prefer the helper RPC for consistency
+      const { error } = await (supabase as any).rpc('mark_notification_read', { _id: notificationId });
       if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["notifications"] });
       queryClient.invalidateQueries({ queryKey: ["notifications", "unread-count"] });
     },
-    onError: (error: any) => {
-      toast({
+    onError: () => {
+      const { toast: t } = { toast };
+      t({
         variant: "destructive",
         title: "Erreur",
         description: "Impossible de marquer la notification comme lue",
@@ -76,22 +82,15 @@ export const useMarkAllNotificationsAsRead = () => {
 
   return useMutation({
     mutationFn: async () => {
-      const { error } = await supabase
-        .from("notifications")
-        .update({ read: true })
-        .eq("read", false);
-      
+      const { error } = await (supabase as any).rpc('mark_all_notifications_read');
       if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["notifications"] });
       queryClient.invalidateQueries({ queryKey: ["notifications", "unread-count"] });
-      toast({
-        title: "Succès",
-        description: "Toutes les notifications ont été marquées comme lues",
-      });
+      toast({ title: "Succès", description: "Toutes les notifications ont été marquées comme lues" });
     },
-    onError: (error: any) => {
+    onError: () => {
       toast({
         variant: "destructive",
         title: "Erreur",

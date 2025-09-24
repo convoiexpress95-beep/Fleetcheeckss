@@ -1,4 +1,4 @@
-project_id = "lucpsjwaglmiejpfxofe"
+project_id = "vdygbqinodzvkdwegvpq"
 
 [functions.generate-tracking-link]
 verify_jwt = true
@@ -11,6 +11,15 @@ verify_jwt = true
 
 [functions.send-push-notification]
 verify_jwt = true
+
+[functions.envoyer-invitation]
+verify_jwt = true
+
+[functions.envoyer-notification]
+verify_jwt = true
+
+[functions.obtenir-itineraire]
+verify_jwt = false
 
 [functions.validate-company-insee]
 verify_jwt = true
@@ -26,3 +35,19 @@ verify_jwt = true
 
 [functions.issue-mission-photo-url]
 verify_jwt = true
+
+[functions.get-directions]
+verify_jwt = false
+
+[functions.public-config]
+verify_jwt = false
+
+[functions.photo-png]
+verify_jwt = false
+
+[functions.generate-invoice-pdf]
+verify_jwt = true
+
+[functions.generate-quote-pdf]
+verify_jwt = true
+

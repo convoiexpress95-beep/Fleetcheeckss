@@ -1,7 +1,9 @@
 {
   "expo": {
+    "main": "./index.js",
     "name": "FleetCheck Mobile",
     "slug": "fleetcheck-mobile",
+    "scheme": "fleetcheck",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -35,8 +37,8 @@
         "ACCESS_FINE_LOCATION",
         "ACCESS_BACKGROUND_LOCATION",
         "CAMERA",
-        "READ_EXTERNAL_STORAGE",
-        "WRITE_EXTERNAL_STORAGE"
+        "FOREGROUND_SERVICE",
+        "FOREGROUND_SERVICE_LOCATION"
       ]
     },
     "web": {
@@ -62,7 +64,6 @@
       [
         "expo-notifications",
         {
-          "icon": "./assets/notification-icon.png",
           "color": "#2563eb",
           "defaultChannel": "default"
         }
@@ -76,10 +77,15 @@
       ],
       "expo-font"
     ],
+    "jsEngine": "hermes",
     "extra": {
+      "SUPABASE_URL": "https://vdygbqinodzvkdwegvpq.supabase.co",
+      "SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZkeWdicWlub2R6dmtkd2VndnBxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTg0MTc5MzgsImV4cCI6MjA3Mzk5MzkzOH0.TTe5vUCj9e08yQtS-UuAqrCPU4lmjIpur1uiPsMXvXo",
+      "MAPBOX_TOKEN": "pk.eyJ1IjoieGNyYWNreiIsImEiOiJjbWR3dzV3cDMxdXIxMmxzYTI0c2Z0N2lpIn0.PFh0zoPCQK9UueLrLKWd0w",
       "eas": {
-        "projectId": "fleetcheck-mobile-expo"
+        "projectId": "285e2aaa-ce61-4ea0-b3b0-9436588e1e6f"
       }
-    }
+    },
+    "owner": "xcrackz.2"
   }
 }

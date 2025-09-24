@@ -153,7 +153,7 @@ export const useDeclineInvitation = () => {
       const { data, error } = await supabase
         .from('contacts')
         .update({
-          status: 'declined',
+          status: 'rejected',
           declined_at: new Date().toISOString()
         })
         .eq('id', contactId)

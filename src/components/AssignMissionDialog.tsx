@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useMyContacts } from '@/hooks/useContacts';
 import { useAssignMission } from '@/hooks/useMissions';
+import { assignMission as assignMarketplaceMission } from '@/services/fleetMarketService';
 
 interface AssignMissionDialogProps {
   mission: any;
@@ -20,10 +21,16 @@ export const AssignMissionDialog = ({ mission, open, onOpenChange }: AssignMissi
     if (!selectedDriver || !mission?.id) return;
 
     try {
-      await assignMission.mutateAsync({
-        id: mission.id,
-        driverId: selectedDriver
-      });
+      // Heuristic: if mission has fields of marketplace/fleetmarket, use service; otherwise use core missions hook
+      const isMarketplace = typeof mission?.statut !== 'undefined' || typeof mission?.vehicule_requis !== 'undefined';
+      if (isMarketplace) {
+        await assignMarketplaceMission(mission.id, selectedDriver);
+      } else {
+        await assignMission.mutateAsync({
+          id: mission.id,
+          driverId: selectedDriver
+        });
+      }
       onOpenChange(false);
       setSelectedDriver('');
     } catch (error) {
@@ -39,7 +46,7 @@ export const AssignMissionDialog = ({ mission, open, onOpenChange }: AssignMissi
             Assigner la mission
           </DialogTitle>
           <DialogDescription className="text-foreground/80">
-            Choisissez un convoyeur pour cette mission: {mission?.title}
+            Choisissez un convoyeur pour cette mission: {mission?.titre || mission?.title}
           </DialogDescription>
         </DialogHeader>
 

@@ -13,6 +13,9 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
+import { useNavigation } from '@react-navigation/native';
+import { supabase } from '../config/supabase';
+import { useAuth } from '../contexts/AuthContext';
 
 interface CovoiturageRide {
   id: string;
@@ -31,10 +34,6 @@ interface CovoiturageRide {
   driver: {
     id: string;
     name: string;
-    avatar?: string;
-    rating: number;
-    reviewCount: number;
-    isVerified: boolean;
   };
 }
 
@@ -50,12 +49,14 @@ interface SearchFilters {
 const { width } = Dimensions.get('window');
 
 export default function CovoiturageScreenComplete({ navigation }: any) {
+  const { user } = useAuth();
   const [rides, setRides] = useState<CovoiturageRide[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'search' | 'my-trips' | 'messages'>('search');
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showFilterModal, setShowFilterModal] = useState(false);
   const [searchExpanded, setSearchExpanded] = useState(true);
+  const [myReservations, setMyReservations] = useState<any[]>([]);
 
   const [filters, setFilters] = useState<SearchFilters>({
     departure: '',
@@ -66,131 +67,142 @@ export default function CovoiturageScreenComplete({ navigation }: any) {
     instantBooking: false,
   });
 
-  // Mock data
-  useEffect(() => {
-    const mockRides: CovoiturageRide[] = [
-      {
-        id: '1',
-        departure: 'Paris',
-        destination: 'Lyon',
-        departure_time: '2025-09-20T09:30:00Z',
-        duration_minutes: 280,
-        price: 45,
-        seats_total: 4,
-        seats_available: 2,
-        route: ['Paris', 'Auxerre', 'Chalon-sur-Saône', 'Lyon'],
-        description: 'Trajet direct sans arrêt, véhicule climatisé.',
-        vehicle_model: 'Audi A4',
-        options: ['Climatisation', 'Musique autorisée', 'Non-fumeur'],
-        status: 'active',
-        driver: {
-          id: 'driver1',
-          name: 'Thomas Dupont',
-          avatar: undefined,
-          rating: 4.8,
-          reviewCount: 125,
-          isVerified: true,
-        },
-      },
-      {
-        id: '2',
-        departure: 'Marseille',
-        destination: 'Nice',
-        departure_time: '2025-09-20T14:15:00Z',
-        duration_minutes: 180,
-        price: 25,
-        seats_total: 3,
-        seats_available: 1,
-        route: ['Marseille', 'Aix-en-Provence', 'Cannes', 'Nice'],
-        description: 'Trajet côtier avec vue sur la mer.',
-        vehicle_model: 'Peugeot 308',
-        options: ['Climatisation', 'Animaux acceptés', 'Bagages autorisés'],
-        status: 'active',
-        driver: {
-          id: 'driver2',
-          name: 'Sophie Martin',
-          avatar: undefined,
-          rating: 4.9,
-          reviewCount: 89,
-          isVerified: true,
-        },
-      },
-      {
-        id: '3',
-        departure: 'Toulouse',
-        destination: 'Bordeaux',
-        departure_time: '2025-09-20T16:00:00Z',
-        duration_minutes: 150,
-        price: 30,
-        seats_total: 4,
-        seats_available: 3,
-        route: ['Toulouse', 'Agen', 'Bordeaux'],
-        description: 'Départ flexible entre 15h30 et 16h30.',
-        vehicle_model: 'Renault Mégane',
-        options: ['Musique autorisée', 'Non-fumeur', 'Vélo accepté'],
-        status: 'active',
-        driver: {
-          id: 'driver3',
-          name: 'Marc Leblanc',
-          avatar: undefined,
-          rating: 4.7,
-          reviewCount: 67,
-          isVerified: false,
-        },
-      },
-      {
-        id: '4',
-        departure: 'Lille',
-        destination: 'Bruxelles',
-        departure_time: '2025-09-21T08:00:00Z',
-        duration_minutes: 75,
-        price: 18,
-        seats_total: 4,
-        seats_available: 2,
-        route: ['Lille', 'Tournai', 'Bruxelles'],
-        description: 'Trajet international, documents requis.',
-        vehicle_model: 'BMW Série 3',
-        options: ['Climatisation', 'Non-fumeur', 'Bagages autorisés'],
-        status: 'active',
-        driver: {
-          id: 'driver4',
-          name: 'Pierre Dubois',
-          avatar: undefined,
-          rating: 4.6,
-          reviewCount: 203,
-          isVerified: true,
-        },
-      },
-      {
-        id: '5',
-        departure: 'Strasbourg',
-        destination: 'Paris',
-        departure_time: '2025-09-21T18:30:00Z',
-        duration_minutes: 300,
-        price: 55,
-        seats_total: 4,
-        seats_available: 1,
-        route: ['Strasbourg', 'Nancy', 'Metz', 'Reims', 'Paris'],
-        description: 'Trajet du soir, départ après 18h.',
-        vehicle_model: 'Mercedes Classe C',
-        options: ['Climatisation', 'Musique autorisée', 'Non-fumeur', 'Bagages autorisés'],
-        status: 'active',
-        driver: {
-          id: 'driver5',
-          name: 'Amélie Rousseau',
-          avatar: undefined,
-          rating: 5.0,
-          reviewCount: 34,
-          isVerified: true,
-        },
-      }
-    ];
+  const nav = useNavigation<any>();
 
-    setTimeout(() => {
-      setRides(mockRides);
-      setLoading(false);
-    }, 1000);
-  }, []);
+  // Charger les trajets en direct depuis Supabase (avec filtres)
+  useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      setLoading(true);
+      try {
+        let query = supabase
+          .from('rides')
+          .select('*')
+          .eq('status', 'active');
+
+        if (filters.departure?.trim()) {
+          query = query.ilike('departure', `%${filters.departure.trim()}%`);
+        }
+        if (filters.destination?.trim()) {
+          query = query.ilike('destination', `%${filters.destination.trim()}%`);
+        }
+        if (filters.date) {
+          const d = new Date(filters.date);
+          const start = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 0, 0, 0);
+          const end = new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1, 0, 0, 0);
+          query = query.gte('departure_time', start.toISOString()).lt('departure_time', end.toISOString());
+        }
+        if (typeof filters.maxPrice === 'number') {
+          query = query.lte('price', filters.maxPrice);
+        }
+
+        query = query.order('departure_time');
+        const { data, error } = await query.limit(200);
+        if (error) throw error;
+        if (!cancelled) {
+          const list = (data || []).map((r: any) => ({
+            id: r.id,
+            departure: r.departure,
+            destination: r.destination,
+            departure_time: r.departure_time,
+            duration_minutes: r.duration_minutes,
+            price: r.price,
+            seats_total: r.seats_total,
+            seats_available: Math.max(0, (r.seats_total ?? 0) - (r.seats_reserved ?? 0)),
+            route: r.route || [],
+            description: r.description,
+            vehicle_model: r.vehicle_model,
+            options: r.options || [],
+            status: r.status,
+            driver: { id: r.driver_id, name: r.driver_name || 'Conducteur' },
+          })) as CovoiturageRide[];
+          setRides(list);
+        }
+      } catch (e) {
+        console.error('[Covoiturage] load rides error', e);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+    load();
+    return () => { cancelled = true; };
+  }, [filters.departure, filters.destination, filters.date?.toDateString?.(), filters.maxPrice]);
+
+  // Charger les réservations de l'utilisateur (onglet Mes trajets)
+  useEffect(() => {
+    let cancelled = false;
+    const loadMine = async () => {
+      if (!user?.id) { setMyReservations([]); return; }
+      try {
+        // Avoid PostgREST relationship embedding (PGRST200); fetch reservations then rides separately
+        const { data: reservations, error } = await supabase
+          .from('ride_reservations')
+          .select('id, ride_id, seats, status, created_at')
+          .eq('passenger_id', user.id)
+          .order('created_at', { ascending: false })
+          .limit(100);
+        if (error) throw error;
+        const rows = reservations || [];
+        // Fetch related rides explicitly and join in JS
+        let merged: any[] = rows as any[];
+        const rideIds = Array.from(new Set(rows.map((r: any) => r.ride_id).filter(Boolean)));
+        if (rideIds.length) {
+          const { data: ridesData, error: ridesErr } = await supabase
+            .from('rides')
+            .select('*')
+            .in('id', rideIds);
+          if (ridesErr) {
+            console.warn('[Covoiturage] fetch rides for reservations error:', ridesErr);
+          }
+          const ridesMap = new Map<string, any>((ridesData || []).map((r: any) => [r.id, r]));
+          merged = rows.map((r: any) => ({ ...r, rides: ridesMap.get(r.ride_id) || null }));
+        }
+        if (!cancelled) setMyReservations(merged);
+      } catch (e) {
+        console.error('[Covoiturage] load my reservations error', e);
+      }
+    };
+    if (activeTab === 'my-trips') loadMine();
+    // Aussi recharger à la connexion
+  }, [activeTab, user?.id]);
+
+  // Realtime: mise à jour des listes lors d'insert/update
+  useEffect(() => {
+    const channels: any[] = [];
+    try {
+      const ch1 = supabase
+        .channel('rt-rides')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'rides' }, (_payload) => {
+          // Recharger les trajets si onglet recherche
+          if (activeTab === 'search') {
+            // Déclencher un petit refresh via setFilters no-op
+            setFilters((f) => ({ ...f }));
+          }
+        })
+        .subscribe();
+      channels.push(ch1);
+
+      if (user?.id) {
+        const ch2 = supabase
+          .channel('rt-ride-reservations')
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'ride_reservations' }, (_payload) => {
+            if (activeTab === 'my-trips') {
+              // Déclencher le rechargement
+              setActiveTab((t) => t); // no-op pour effet
+            }
+          })
+          .subscribe();
+        channels.push(ch2);
+      }
+    } catch (e) {
+      console.warn('Realtime subscription error', e);
+    }
+    return () => {
+      channels.forEach((ch) => {
+        try { supabase.removeChannel(ch); } catch {}
+      });
+    };
+  }, [activeTab, user?.id]);
 
   const filteredRides = rides.filter(ride => {
     const matchesDeparture = !filters.departure || 
@@ -206,14 +218,8 @@ export default function CovoiturageScreenComplete({ navigation }: any) {
   });
 
   const handleSearch = () => {
-    if (!filters.departure && !filters.destination) {
-      Alert.alert('Recherche', 'Veuillez saisir au moins un lieu de départ ou d\'arrivée');
-      return;
-    }
     setSearchExpanded(false);
-    // Simulation de recherche
-    setLoading(true);
-    setTimeout(() => setLoading(false), 500);
+    // Le chargement se déclenche automatiquement via l'effet de filtres
   };
 
   const handleBookRide = (ride: CovoiturageRide) => {
@@ -224,14 +230,49 @@ export default function CovoiturageScreenComplete({ navigation }: any) {
         { text: 'Annuler', style: 'cancel' },
         {
           text: 'Réserver',
-          onPress: () => {
-            Alert.alert(
-              'Réservation confirmée',
-              'Votre demande de réservation a été envoyée au conducteur.',
-              [{ text: 'OK' }]
-            );
+          onPress: async () => {
+            try {
+              if (!user?.id) { Alert.alert('Erreur', 'Vous devez être connecté'); return; }
+              const { error } = await supabase.from('ride_reservations').insert({
+                ride_id: ride.id,
+                passenger_id: user.id,
+                seats: Math.max(1, filters.passengers),
+                status: 'pending',
+              });
+              if (error) throw error;
+              Alert.alert('Réservation envoyée', 'Votre demande a été envoyée au conducteur.');
+            } catch (e: any) {
+              Alert.alert('Erreur', e.message || 'Impossible de créer la réservation');
+            }
           }
         }
+      ]
+    );
+  };
+
+  const handleCancelReservation = (reservationId: string) => {
+    Alert.alert(
+      'Annuler la réservation',
+      'Êtes-vous sûr de vouloir annuler cette réservation ? ',
+      [
+        { text: 'Non', style: 'cancel' },
+        {
+          text: 'Oui, annuler',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              const { error } = await supabase
+                .from('ride_reservations')
+                .update({ status: 'cancelled' })
+                .eq('id', reservationId);
+              if (error) throw error;
+              // Refresh my trips
+              setActiveTab((t) => t);
+            } catch (e: any) {
+              Alert.alert('Erreur', e.message || 'Impossible d\'annuler la réservation');
+            }
+          },
+        },
       ]
     );
   };
@@ -257,7 +298,7 @@ export default function CovoiturageScreenComplete({ navigation }: any) {
     });
   };
 
-  if (loading && rides.length === 0) {
+  if (loading) {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.loadingContainer}>
@@ -270,20 +311,31 @@ export default function CovoiturageScreenComplete({ navigation }: any) {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <View style={styles.headerContent}>
-          <View style={styles.headerLeft}>
-            <Text style={styles.headerTitle}>Covoiturage</Text>
-            <Text style={styles.headerSubtitle}>Trouvez votre trajet idéal</Text>
-          </View>
-          <TouchableOpacity 
-            style={styles.headerAction}
-            onPress={() => setShowFilterModal(true)}
-          >
-            <Feather name="sliders" size={20} color="#d1d5db" />
-          </TouchableOpacity>
-        </View>
+      {/* Contrôle segmenté */}
+      <View style={styles.segmented}>
+        <TouchableOpacity
+          style={[styles.segBtn, activeTab === 'search' && styles.segBtnActive]}
+          onPress={() => setActiveTab('search')}
+        >
+          <Text style={[styles.segText, activeTab === 'search' && styles.segTextActive]}>Recherche</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.segBtn, activeTab === 'my-trips' && styles.segBtnActive]}
+          onPress={() => {
+            setActiveTab('my-trips');
+          }}
+        >
+          <Text style={[styles.segText, activeTab === 'my-trips' && styles.segTextActive]}>Mes trajets</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.segBtn, activeTab === 'messages' && styles.segBtnActive]}
+          onPress={() => {
+            setActiveTab('messages');
+            nav.navigate('CovoiturageMessages');
+          }}
+        >
+          <Text style={[styles.segText, activeTab === 'messages' && styles.segTextActive]}>Messages</Text>
+        </TouchableOpacity>
       </View>
 
       {/* Search Form */}
@@ -332,241 +384,281 @@ export default function CovoiturageScreenComplete({ navigation }: any) {
             </View>
 
             <View style={styles.searchRow}>
-              <TouchableOpacity
-                style={styles.dateField}
-                onPress={() => setShowDatePicker(true)}
-              >
+              <View style={styles.dateField}>
                 <Text style={styles.searchLabel}>
                   <Feather name="calendar" size={14} color="#9ca3af" /> Date
                 </Text>
-                <View style={styles.dateInput}>
+                <TouchableOpacity style={styles.dateInput} onPress={() => setShowDatePicker(true)}>
                   <Text style={styles.dateText}>
-                    {filters.date 
-                      ? filters.date.toLocaleDateString('fr-FR')
-                      : 'Aujourd\'hui'
-                    }
+                    {filters.date ? new Date(filters.date).toLocaleDateString('fr-FR') : 'Choisir une date'}
                   </Text>
                   <Feather name="calendar" size={16} color="#9ca3af" />
-                </View>
-              </TouchableOpacity>
+                </TouchableOpacity>
+              </View>
 
               <View style={styles.passengersField}>
                 <Text style={styles.searchLabel}>
-                  <Feather name="users" size={14} color="#9ca3af" /> Places
+                  <Feather name="users" size={14} color="#9ca3af" /> Passagers
                 </Text>
                 <View style={styles.passengersControl}>
                   <TouchableOpacity
                     style={styles.passengersButton}
-                    onPress={() => filters.passengers > 1 && 
-                      setFilters(prev => ({ ...prev, passengers: prev.passengers - 1 }))}
+                    onPress={() => setFilters(prev => ({ ...prev, passengers: Math.max(1, prev.passengers - 1) }))}
                   >
-                    <Feather name="minus" size={16} color="#06b6d4" />
+                    <Feather name="minus" size={16} color="#d1d5db" />
                   </TouchableOpacity>
                   <Text style={styles.passengersText}>{filters.passengers}</Text>
                   <TouchableOpacity
                     style={styles.passengersButton}
-                    onPress={() => filters.passengers < 8 && 
-                      setFilters(prev => ({ ...prev, passengers: prev.passengers + 1 }))}
+                    onPress={() => setFilters(prev => ({ ...prev, passengers: prev.passengers + 1 }))}
                   >
-                    <Feather name="plus" size={16} color="#06b6d4" />
+                    <Feather name="plus" size={16} color="#d1d5db" />
                   </TouchableOpacity>
                 </View>
               </View>
-            </View>
 
-            <TouchableOpacity style={styles.searchButton} onPress={handleSearch}>
-              <View style={styles.searchButtonGradient}>
-                <Feather name="search" size={18} color="white" />
-                <Text style={styles.searchButtonText}>Rechercher</Text>
-              </View>
-            </TouchableOpacity>
+              <TouchableOpacity style={styles.searchButton} onPress={handleSearch}>
+                <View style={styles.searchButtonGradient}>
+                  <Feather name="search" size={16} color="white" />
+                  <Text style={styles.searchButtonText}>Rechercher</Text>
+                </View>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       )}
 
-      {/* Collapsed Search Bar */}
       {!searchExpanded && (
-        <TouchableOpacity
-          style={styles.collapsedSearch}
-          onPress={() => setSearchExpanded(true)}
-        >
+        <TouchableOpacity style={styles.collapsedSearch} onPress={() => setSearchExpanded(true)}>
           <View style={styles.collapsedSearchContent}>
             <Feather name="search" size={16} color="#9ca3af" />
             <Text style={styles.collapsedSearchText}>
-              {filters.departure && filters.destination 
+              {filters.departure && filters.destination
                 ? `${filters.departure} → ${filters.destination}`
-                : 'Rechercher un trajet'
-              }
+                : 'Rechercher un trajet'}
             </Text>
             <Feather name="chevron-down" size={16} color="#9ca3af" />
           </View>
         </TouchableOpacity>
       )}
 
-      {/* Results Header */}
-      <View style={styles.resultsHeader}>
-        <Text style={styles.resultsTitle}>
-          {loading ? 'Recherche en cours...' : `${filteredRides.length} trajets trouvés`}
-        </Text>
-        {filteredRides.length > 0 && (
-          <TouchableOpacity style={styles.sortButton}>
-            <Feather name="filter" size={14} color="#9ca3af" />
-            <Text style={styles.sortText}>Trier</Text>
-          </TouchableOpacity>
-        )}
-      </View>
+      {activeTab === 'my-trips' && (
+        <>
+          {(!user?.id) ? (
+            <View style={styles.emptyState}>
+              <Feather name="user" size={32} color="#9ca3af" />
+              <Text style={styles.emptyTitle}>Connexion requise</Text>
+              <Text style={styles.emptyDescription}>Connectez-vous pour voir vos réservations.</Text>
+            </View>
+          ) : myReservations.length === 0 ? (
+            <View style={styles.emptyState}>
+              <Feather name="calendar" size={32} color="#9ca3af" />
+              <Text style={styles.emptyTitle}>Aucune réservation</Text>
+              <Text style={styles.emptyDescription}>Vos réservations apparaîtront ici.</Text>
+            </View>
+          ) : (
+            <ScrollView contentContainerStyle={{ paddingBottom: 24 }}>
+              {myReservations.map((res: any) => (
+                <View key={res.id} style={styles.rideCard}>
+                  <View style={styles.rideHeader}>
+                    <View style={styles.routeInfo}>
+                      <View style={styles.routePoint}>
+                        <View style={[styles.routeDot, { backgroundColor: '#10b981' }]} />
+                        <Text style={styles.routeCity}>{res.rides?.departure}</Text>
+                      </View>
+                      <View style={styles.routeLine}>
+                        <View style={styles.routePath} />
+                        <Text style={styles.routeDuration}>{formatDuration(res.rides?.duration_minutes)}</Text>
+                      </View>
+                      <View style={styles.routePoint}>
+                        <View style={[styles.routeDot, { backgroundColor: '#ef4444' }]} />
+                        <Text style={styles.routeCity}>{res.rides?.destination}</Text>
+                      </View>
+                    </View>
+                    <View style={styles.timeInfo}>
+                      <Text style={styles.timeText}>{formatTime(res.rides?.departure_time)}</Text>
+                      <Text style={styles.rideDateText}>{formatDate(res.rides?.departure_time)}</Text>
+                    </View>
+                  </View>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <View style={styles.seatsInfo}>
+                      <MaterialCommunityIcons name="seat-passenger" size={18} color="#6b7280" />
+                      <Text style={styles.seatsText}>{res.seats} place(s)</Text>
+                    </View>
+                    <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
+                      <View style={styles.statusBadge}>
+                        <Text style={styles.statusText}>{res.status}</Text>
+                      </View>
+                      <TouchableOpacity
+                        style={styles.bookButton}
+                        onPress={() => nav.navigate('CovoiturageMessages', { initialRideId: res.ride_id })}
+                      >
+                        <View style={[styles.bookButtonGradient, { backgroundColor: '#0ea5e9' }]}>
+                          <Text style={styles.bookButtonText}>Messages</Text>
+                        </View>
+                      </TouchableOpacity>
+                      {res.status === 'pending' && (
+                        <TouchableOpacity
+                          style={styles.bookButton}
+                          onPress={() => handleCancelReservation(res.id)}
+                        >
+                          <View style={[styles.bookButtonGradient, { backgroundColor: '#ef4444' }]}>
+                            <Text style={styles.bookButtonText}>Annuler</Text>
+                          </View>
+                        </TouchableOpacity>
+                      )}
+                    </View>
+                  </View>
+                </View>
+              ))}
+            </ScrollView>
+          )}
+        </>
+      )}
 
-      {/* Rides List */}
-      <ScrollView style={styles.ridesList} showsVerticalScrollIndicator={false}>
-        {loading ? (
-          <View style={styles.loadingRides}>
-            <ActivityIndicator size="small" color="#06b6d4" />
-          </View>
-        ) : filteredRides.length === 0 ? (
-          <View style={styles.emptyState}>
-            <MaterialCommunityIcons name="car-multiple" size={48} color="#6b7280" />
-            <Text style={styles.emptyTitle}>Aucun trajet trouvé</Text>
-            <Text style={styles.emptyDescription}>
-              Essayez de modifier vos critères de recherche ou explorez d'autres dates.
+      {activeTab === 'search' && (
+        <>
+          {/* Results Header */}
+          <View style={styles.resultsHeader}>
+            <Text style={styles.resultsTitle}>
+              {loading ? 'Recherche en cours...' : `${filteredRides.length} trajets trouvés`}
             </Text>
-            <TouchableOpacity 
-              style={styles.expandSearchButton}
-              onPress={() => setSearchExpanded(true)}
-            >
-              <Text style={styles.expandSearchText}>Modifier la recherche</Text>
-            </TouchableOpacity>
+            {filteredRides.length > 0 && (
+              <TouchableOpacity style={styles.sortButton} onPress={() => setShowFilterModal(true)}>
+                <Feather name="filter" size={14} color="#9ca3af" />
+                <Text style={styles.sortText}>Filtres</Text>
+              </TouchableOpacity>
+            )}
           </View>
-        ) : (
-          filteredRides.map((ride) => (
-            <View key={ride.id} style={styles.rideCard}>
-              {/* Route and Time */}
-              <View style={styles.rideHeader}>
-                <View style={styles.routeInfo}>
-                  <View style={styles.routePoint}>
-                    <View style={[styles.routeDot, { backgroundColor: '#10b981' }]} />
-                    <Text style={styles.routeCity}>{ride.departure}</Text>
-                  </View>
-                  
-                  <View style={styles.routeLine}>
-                    <View style={styles.routePath} />
-                    <Text style={styles.routeDuration}>
-                      {formatDuration(ride.duration_minutes)}
-                    </Text>
-                  </View>
-                  
-                  <View style={styles.routePoint}>
-                    <View style={[styles.routeDot, { backgroundColor: '#ef4444' }]} />
-                    <Text style={styles.routeCity}>{ride.destination}</Text>
-                  </View>
-                </View>
-                
-                <View style={styles.timeInfo}>
-                  <Text style={styles.timeText}>{formatTime(ride.departure_time)}</Text>
-                  <Text style={styles.rideDateText}>{formatDate(ride.departure_time)}</Text>
-                </View>
+
+          {/* Rides List */}
+          <ScrollView style={styles.ridesList} showsVerticalScrollIndicator={false}>
+            {loading ? (
+              <View style={styles.loadingRides}>
+                <ActivityIndicator size="small" color="#06b6d4" />
               </View>
-
-              {/* Driver Info */}
-              <View style={styles.driverInfo}>
-                <View style={styles.driverAvatar}>
-                  <Text style={styles.driverInitials}>
-                    {ride.driver.name.split(' ').map(n => n[0]).join('')}
-                  </Text>
-                </View>
-                
-                <View style={styles.driverDetails}>
-                  <View style={styles.driverNameRow}>
-                    <Text style={styles.driverName}>{ride.driver.name}</Text>
-                    {ride.driver.isVerified && (
-                      <Feather name="check-circle" size={14} color="#10b981" />
-                    )}
-                  </View>
-                  
-                  <View style={styles.driverRating}>
-                    <Feather name="star" size={12} color="#f59e0b" />
-                    <Text style={styles.ratingText}>
-                      {ride.driver.rating} ({ride.driver.reviewCount} avis)
-                    </Text>
-                  </View>
-                  
-                  {ride.vehicle_model && (
-                    <Text style={styles.vehicleText}>
-                      <MaterialCommunityIcons name="car" size={12} color="#9ca3af" />
-                      {' '}{ride.vehicle_model}
-                    </Text>
-                  )}
-                </View>
-              </View>
-
-              {/* Route Details */}
-              {ride.route.length > 2 && (
-                <View style={styles.routeDetails}>
-                  <Text style={styles.routeLabel}>Étapes:</Text>
-                  <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                    {ride.route.map((city, index) => (
-                      <View key={index} style={styles.routeStep}>
-                        <Text style={styles.routeStepText}>{city}</Text>
-                        {index < ride.route.length - 1 && (
-                          <Feather name="arrow-right" size={10} color="#9ca3af" />
-                        )}
-                      </View>
-                    ))}
-                  </ScrollView>
-                </View>
-              )}
-
-              {/* Options */}
-              {ride.options.length > 0 && (
-                <View style={styles.optionsContainer}>
-                  <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                    {ride.options.slice(0, 3).map((option, index) => (
-                      <View key={index} style={styles.optionBadge}>
-                        <Text style={styles.optionText}>{option}</Text>
-                      </View>
-                    ))}
-                    {ride.options.length > 3 && (
-                      <View style={styles.moreOptionsBadge}>
-                        <Text style={styles.moreOptionsText}>+{ride.options.length - 3}</Text>
-                      </View>
-                    )}
-                  </ScrollView>
-                </View>
-              )}
-
-              {/* Price and Booking */}
-              <View style={styles.bookingSection}>
-                <View style={styles.priceInfo}>
-                  <Text style={styles.price}>{ride.price}€</Text>
-                  <Text style={styles.priceLabel}>par personne</Text>
-                  <View style={styles.seatsInfo}>
-                    <Feather name="users" size={12} color="#9ca3af" />
-                    <Text style={styles.seatsText}>
-                      {ride.seats_available}/{ride.seats_total} places
-                    </Text>
-                  </View>
-                </View>
-                
+            ) : filteredRides.length === 0 ? (
+              <View style={styles.emptyState}>
+                <MaterialCommunityIcons name="car-multiple" size={48} color="#6b7280" />
+                <Text style={styles.emptyTitle}>Aucun trajet trouvé</Text>
+                <Text style={styles.emptyDescription}>
+                  Essayez de modifier vos critères de recherche ou explorez d'autres dates.
+                </Text>
                 <TouchableOpacity 
-                  style={[
-                    styles.bookButton,
-                    { opacity: ride.seats_available < filters.passengers ? 0.5 : 1 }
-                  ]}
-                  disabled={ride.seats_available < filters.passengers}
-                  onPress={() => handleBookRide(ride)}
+                  style={styles.expandSearchButton}
+                  onPress={() => setSearchExpanded(true)}
                 >
-                  <View style={styles.bookButtonGradient}>
-                    <Text style={styles.bookButtonText}>
-                      {ride.seats_available < filters.passengers ? 'Complet' : 'Réserver'}
-                    </Text>
-                  </View>
+                  <Text style={styles.expandSearchText}>Modifier la recherche</Text>
                 </TouchableOpacity>
               </View>
-            </View>
-          ))
-        )}
-        
-        <View style={styles.bottomSpacing} />
-      </ScrollView>
+            ) : (
+              <>
+              {filteredRides.map((ride) => (
+                <View key={ride.id} style={styles.rideCard}>
+                  {/* Route and Time */}
+                  <View style={styles.rideHeader}>
+                    <View style={styles.routeInfo}>
+                      <View style={styles.routePoint}>
+                        <View style={[styles.routeDot, { backgroundColor: '#10b981' }]} />
+                        <Text style={styles.routeCity}>{ride.departure}</Text>
+                      </View>
+                      
+                      <View style={styles.routeLine}>
+                        <View style={styles.routePath} />
+                        <Text style={styles.routeDuration}>
+                          {formatDuration(ride.duration_minutes)}
+                        </Text>
+                      </View>
+                      
+                      <View style={styles.routePoint}>
+                        <View style={[styles.routeDot, { backgroundColor: '#ef4444' }]} />
+                        <Text style={styles.routeCity}>{ride.destination}</Text>
+                      </View>
+                    </View>
+                    
+                    <View style={styles.timeInfo}>
+                      <Text style={styles.timeText}>{formatTime(ride.departure_time)}</Text>
+                      <Text style={styles.rideDateText}>{formatDate(ride.departure_time)}</Text>
+                    </View>
+                  </View>
+
+                  {/* Driver Info */}
+                  <View style={styles.driverInfo}>
+                    <View style={styles.driverAvatar}>
+                      <Text style={styles.driverInitials}>
+                        {ride.driver.name.split(' ').map(n => n[0]).join('')}
+                      </Text>
+                    </View>
+                    
+                    <View style={styles.driverDetails}>
+                      <View style={styles.driverNameRow}>
+                        <Text style={styles.driverName}>{ride.driver.name}</Text>
+                      </View>
+                    </View>
+                  </View>
+
+                  {/* Options and details */}
+                  {ride.route.length > 2 && (
+                    <View style={styles.routeDetails}>
+                      <Text style={styles.routeLabel}>Étapes:</Text>
+                      <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                        {ride.route.map((city, index) => (
+                          <View key={index} style={styles.routeStep}>
+                            <Text style={styles.routeStepText}>{city}</Text>
+                            {index < ride.route.length - 1 && (
+                              <Feather name="arrow-right" size={10} color="#9ca3af" />
+                            )}
+                          </View>
+                        ))}
+                      </ScrollView>
+                    </View>
+                  )}
+
+                  {/* Price and Booking */}
+                  <View style={styles.bookingSection}>
+                    <View style={styles.priceInfo}>
+                      <Text style={styles.price}>{ride.price}€</Text>
+                      <Text style={styles.priceLabel}>par personne</Text>
+                      <View style={styles.seatsInfo}>
+                        <Feather name="users" size={12} color="#9ca3af" />
+                        <Text style={styles.seatsText}>
+                          {ride.seats_available}/{ride.seats_total} places
+                        </Text>
+                      </View>
+                    </View>
+                    
+                    <View style={{ flexDirection: 'row', gap: 8 }}>
+                      <TouchableOpacity
+                        style={styles.bookButton}
+                        onPress={() => nav.navigate('CovoiturageMessages', { initialRideId: ride.id })}
+                      >
+                        <View style={[styles.bookButtonGradient, { backgroundColor: '#0ea5e9' }]}>
+                          <Text style={styles.bookButtonText}>Messages</Text>
+                        </View>
+                      </TouchableOpacity>
+                      <TouchableOpacity 
+                        style={[
+                          styles.bookButton,
+                          { opacity: ride.seats_available < filters.passengers ? 0.5 : 1 }
+                        ]}
+                        disabled={ride.seats_available < filters.passengers}
+                        onPress={() => handleBookRide(ride)}
+                      >
+                        <View style={styles.bookButtonGradient}>
+                          <Text style={styles.bookButtonText}>
+                            {ride.seats_available < filters.passengers ? 'Complet' : 'Réserver'}
+                          </Text>
+                        </View>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                </View>
+              ))}
+              </>
+            )}
+          </ScrollView>
+        </>
+      )}
 
       {/* Date Picker Modal */}
       {showDatePicker && (
@@ -697,6 +789,13 @@ export default function CovoiturageScreenComplete({ navigation }: any) {
           </View>
         </View>
       </Modal>
+
+      {/* Publish Ride Button */}
+      <View style={{ paddingHorizontal: 12, marginBottom: 12 }}>
+        <TouchableOpacity onPress={() => nav.navigate('CovoituragePublish')} style={{ backgroundColor: '#10b981', borderRadius: 10, alignItems: 'center', paddingVertical: 10 }}>
+          <Text style={{ color: '#042f2e', fontWeight: '800' }}>Publier un trajet (1 crédit)</Text>
+        </TouchableOpacity>
+      </View>
     </SafeAreaView>
   );
 }
@@ -998,20 +1097,6 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 15,
     fontWeight: '600',
-  },
-  driverRating: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 4,
-    gap: 4,
-  },
-  ratingText: {
-    color: '#d1d5db',
-    fontSize: 12,
-  },
-  vehicleText: {
-    color: '#9ca3af',
-    fontSize: 12,
   },
   routeDetails: {
     marginBottom: 16,
@@ -1317,5 +1402,42 @@ const styles = StyleSheet.create({
     color: '#9ca3af',
     fontSize: 14,
     fontWeight: '500',
+  },
+  segmented: {
+    flexDirection: 'row',
+    backgroundColor: '#111827',
+    borderRadius: 10,
+    padding: 4,
+    marginHorizontal: 12,
+    marginTop: 8,
+    marginBottom: 12,
+  },
+  segBtn: {
+    flex: 1,
+    paddingVertical: 10,
+    alignItems: 'center',
+    borderRadius: 8,
+  },
+  segBtnActive: {
+    backgroundColor: '#0f172a',
+  },
+  segText: {
+    color: '#9ca3af',
+    fontWeight: '700',
+  },
+  segTextActive: {
+    color: '#06b6d4',
+  },
+  statusBadge: {
+    backgroundColor: 'rgba(55, 65, 81, 0.5)',
+    borderRadius: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  statusText: {
+    color: '#d1d5db',
+    fontSize: 12,
+    fontWeight: '600',
+    textTransform: 'capitalize',
   },
 });

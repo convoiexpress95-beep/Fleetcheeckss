@@ -1,7 +1,5 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"; // Avatar conservé pour style
-import UserAvatar from '@/components/UserAvatar';
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { MapPin, Calendar, Clock, Users, Euro, Star, Phone, MessageCircle, Car, Shield, Snowflake, Music, CigaretteOff, Heart, Share2 } from "lucide-react";
@@ -191,46 +189,8 @@ const TripDetails = () => {
             </Card>
           </div>
 
-          {/* Profil du conducteur et réservation */}
+          {/* Réservation */}
           <div className="space-y-6">
-            {/* Profil du conducteur */}
-            <Card className="glass-card border border-border/50 shadow-card">
-              <CardContent className="p-6">
-                <h3 className="text-lg font-semibold mb-4">Conducteur</h3>
-
-                <div className="flex items-center gap-4 mb-6">
-                  <UserAvatar src={trip.driver.avatar} name={trip.driver.name} className="w-16 h-16 ring-2 ring-primary/20" />
-                  <div className="flex-1">
-                    <div className="font-semibold">{trip.driver.name}</div>
-                    <div className="flex items-center gap-1 text-sm">
-                      <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
-                      <span className="font-medium">{trip.driver.rating}</span>
-                      <span className="text-muted-foreground">({trip.driver.reviews} avis)</span>
-                    </div>
-                    <div className="text-sm text-muted-foreground">28 ans • Membre depuis 2021</div>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-4 mb-6">
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <Shield className="w-4 h-4 text-primary" />
-                    <span>Profil vérifié</span>
-                  </div>
-                </div>
-
-                <div className="flex gap-2">
-                  <Button variant="outline" size="sm" className="flex-1">
-                    <MessageCircle className="w-4 h-4" />
-                    Message
-                  </Button>
-                  <Button variant="outline" size="sm" className="flex-1">
-                    <Phone className="w-4 h-4" />
-                    Appeler
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-
             {/* Réservation */}
             <Card className="glass-card border border-border/50 shadow-card">
               <CardContent className="p-6">

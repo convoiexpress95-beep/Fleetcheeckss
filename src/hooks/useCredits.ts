@@ -2,10 +2,8 @@ import * as React from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import type { SubscriptionRow } from '@/types/db-partials';
 import { useAuth } from '@/contexts/AuthContext';
-import type { Database } from '@/integrations/supabase/types.extended';
-
-type CreditsWalletRow = Database['public']['Tables']['credits_wallets']['Row'];
-type CreditsLedgerRow = Database['public']['Tables']['credits_ledger']['Row'];
+type CreditsWalletRow = { balance: number };
+type CreditsLedgerRow = { delta: number };
 
 interface CreditsState {
   loading: boolean;
@@ -34,7 +32,7 @@ export function useCredits(): CreditsState {
       const [subs, wallet, ledger] = await Promise.all([
         supabase.from('subscriptions').select('*').eq('user_id', user.id).maybeSingle(),
         supabase.from('credits_wallets').select('*').eq('user_id', user.id).maybeSingle(),
-        supabase.from('credits_ledger').select('amount').eq('user_id', user.id).order('created_at', { ascending: false }).limit(50),
+  supabase.from('credits_ledger').select('delta').eq('user_id', user.id).order('created_at', { ascending: false }).limit(50),
       ] as const);
       if (subs.error) throw subs.error;
       if (wallet.error) throw wallet.error;
@@ -42,7 +40,7 @@ export function useCredits(): CreditsState {
   const sub = subs.data as SubscriptionRow | null;
   const w = wallet.data as CreditsWalletRow | null;
   const ledgerRows = (ledger.data as CreditsLedgerRow[] | null) || [];
-      const ledger_delta = ledgerRows.reduce((acc, r) => acc + (r.amount || 0), 0);
+  const ledger_delta = ledgerRows.reduce((acc, r) => acc + (r.delta || 0), 0);
       setState({
         loading: false,
         error: null,

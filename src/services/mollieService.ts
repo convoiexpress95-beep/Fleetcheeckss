@@ -45,8 +45,9 @@ export const createMolliePayment = async (paymentData: PaymentData) => {
       .from('credits_ledger')
       .insert({
         user_id: metadata.userId,
-        amount: creditsAmount,
+        delta: creditsAmount,
         reason: `Achat ${description}`,
+        ref: `mollie:${paymentId}`,
         created_at: new Date().toISOString()
       });
 

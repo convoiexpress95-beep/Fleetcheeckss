@@ -25,17 +25,24 @@ export default function VerificationPage(){
   const [loading, setLoading] = useState(false);
   const [siret, setSiret] = useState('');
   const [docs, setDocs] = useState<DocRow[]>([]);
+  const [featureAvailable, setFeatureAvailable] = useState(false);
 
   useEffect(() => { (async () => {
     if (!user) return;
-    const { data: prof } = await supabase.from('profiles').select('siret').eq('user_id', user.id).maybeSingle();
-    if (prof?.siret) setSiret(prof.siret);
-    await refreshDocs();
+    // Vérifie la présence des colonnes/tables nécessaires en faisant des sélections HEAD
+    try {
+      const prof = await supabase.from('profiles').select('user_id', { count: 'exact', head: true }).limit(1);
+      // Pas de colonne siret dans le schéma actuel; on ne tente pas de la lire
+      const verif = await supabase.from('verification_documents' as any).select('id', { count: 'exact', head: true }).limit(1);
+      setFeatureAvailable(!verif.error);
+    } catch (_) {
+      setFeatureAvailable(false);
+    }
   })(); }, [user?.id]);
 
   const refreshDocs = async () => {
-    if (!user) return;
-    const { data } = await supabase
+    if (!user || !featureAvailable) return;
+    const { data } = await (supabase as any)
       .from('verification_documents')
       .select('id, document_type, document_name, document_url, status, upload_date')
       .eq('user_id', user.id)
@@ -51,7 +58,8 @@ export default function VerificationPage(){
     }
     setLoading(true);
     try {
-      const { error } = await supabase.from('profiles').update({ siret }).eq('user_id', user.id);
+      // Le champ siret n'existe pas actuellement; on stocke en attendant dans company_info si disponible
+  const { error } = await (supabase as any).from('company_info').upsert({ user_id: user.id, siret, updated_at: new Date().toISOString() });
       if (error) throw error;
       toast({ title: 'SIRET enregistré' });
     } catch (e:any) {
@@ -60,7 +68,7 @@ export default function VerificationPage(){
   };
 
   const upload = async (type: string, file: File) => {
-    if (!user) return;
+  if (!user || !featureAvailable) return;
     setLoading(true);
     try {
       const ext = file.name.split('.').pop();
@@ -69,7 +77,7 @@ export default function VerificationPage(){
       if (upErr) throw upErr;
       const { data: urlData } = supabase.storage.from('verification').getPublicUrl(path);
       const url = urlData.publicUrl;
-      const { error: insErr } = await supabase
+      const { error: insErr } = await (supabase as any)
         .from('verification_documents')
         .insert({ user_id: user.id, document_type: type, document_name: file.name, document_url: url, status: 'pending' });
       if (insErr) throw insErr;

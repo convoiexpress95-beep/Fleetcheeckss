@@ -149,7 +149,8 @@ export const useMissions = (filters: any = {}, page = 0, pageSize = 10) => {
           .from('missions')
           .select(`*, vehicle_model:vehicle_models!missions_vehicle_model_id_fkey(id, make, model, body_type, generation, image_path)`, { count: 'exact' }) // join vehicle model
           .order('created_at', { ascending: false });
-        if (filters.status && filters.status !== 'all') q1 = q1.eq('status', filters.status);
+        // TODO: La colonne status n'existe pas actuellement dans la table missions
+        // if (filters.status && filters.status !== 'all') q1 = q1.eq('status', filters.status);
         if (filters.kind) q1 = q1.eq('kind', filters.kind);
         if (filters.vehicleGroup && filters.vehicleGroup !== 'all') {
           const groupLists: Record<string, string[]> = {
@@ -187,7 +188,8 @@ export const useMissions = (filters: any = {}, page = 0, pageSize = 10) => {
     .from('missions')
     .select('*', { count: 'exact' })
     .order('created_at', { ascending: false });
-  if (filters.status && filters.status !== 'all') q2 = q2.eq('status', filters.status);
+  // TODO: La colonne status n'existe pas actuellement dans la table missions  
+  // if (filters.status && filters.status !== 'all') q2 = q2.eq('status', filters.status);
   if (filters.kind) q2 = q2.eq('kind', filters.kind);
         if (filters.vehicleGroup && filters.vehicleGroup !== 'all') {
           const groupLists: Record<string, string[]> = {

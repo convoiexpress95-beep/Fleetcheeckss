@@ -98,9 +98,9 @@ export const NotificationBell = () => {
               <DropdownMenuItem
                 key={notification.id}
                 className={`p-3 cursor-pointer transition-colors ${
-                  !notification.read ? 'bg-primary/10 border-l-2 border-l-primary' : ''
+                  !notification.read_at ? 'bg-primary/10 border-l-2 border-l-primary' : ''
                 }`}
-                onClick={() => handleNotificationClick(notification.id, notification.read)}
+                onClick={() => handleNotificationClick(notification.id, !!notification.read_at)}
               >
                 <div className="flex items-start gap-3 w-full">
                   <span className="text-lg mt-0.5">
@@ -111,7 +111,7 @@ export const NotificationBell = () => {
                       <p className="font-medium text-sm line-clamp-1">
                         {notification.title}
                       </p>
-                      {!notification.read && (
+                      {!notification.read_at && (
                         <div className="w-2 h-2 bg-primary rounded-full flex-shrink-0" />
                       )}
                     </div>

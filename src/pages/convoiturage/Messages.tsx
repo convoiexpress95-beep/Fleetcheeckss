@@ -1,8 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"; // Conservé pour structure
-import UserAvatar from '@/components/UserAvatar';
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -129,13 +127,6 @@ const Messages = () => {
                       onClick={() => setSelectedConversation(conversation.id)}
                     >
                       <div className="flex items-start gap-3">
-                        <div className="relative">
-                          <UserAvatar src={conversation.participant.avatar} name={conversation.participant.name} className="w-12 h-12" />
-                          {conversation.participant.online && (
-                            <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-500 border-2 border-background rounded-full"></div>
-                          )}
-                        </div>
-
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center justify-between mb-1">
                             <h3 className="font-semibold truncate">{conversation.participant.name}</h3>
@@ -179,7 +170,7 @@ const Messages = () => {
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
                       <div className="relative">
-                        <UserAvatar src={selectedConv.participant.avatar} name={selectedConv.participant.name} className="w-10 h-10" />
+                        {/* <UserAvatar src={selectedConv.participant.avatar} name={selectedConv.participant.name} className="w-10 h-10" /> */}
                       </div>
                       <div>
                         <h3 className="font-semibold">{selectedConv.participant.name}</h3>
@@ -209,7 +200,7 @@ const Messages = () => {
                   <div className="space-y-4">
                     {messages.map((message) => (
                       <div key={message.id} className={`flex items-start gap-3 ${message.sender === "me" ? "flex-row-reverse" : ""}`}>
-                        <UserAvatar src={message.avatar} name={message.sender === 'me' ? 'Moi' : selectedConv?.participant.name} className="w-8 h-8" />
+                        {/* <UserAvatar src={message.avatar} name={message.sender === 'me' ? 'Moi' : selectedConv?.participant.name} className="w-8 h-8" /> */}
 
                         <div className={`max-w-[70%] ${message.sender === "me" ? "text-right" : ""}`}>
                           <div className={`p-3 rounded-lg ${message.sender === "me" ? "bg-primary text-primary-foreground ml-auto" : "bg-muted"}`}>

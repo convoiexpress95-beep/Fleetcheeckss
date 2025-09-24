@@ -30,13 +30,13 @@ export async function fetchMarketplaceMissions() {
   const tryTables = ['marketplace_missions', 'fleetmarket_missions'] as const;
   let lastError: any = null;
   for (const table of tryTables) {
-    const { data, error } = await supabase
-      .from(table)
+    const builder: any = (supabase as any).from(table as any);
+    const { data, error } = await builder
       .select('*')
       .in('statut', ['ouverte', 'en_negociation'])
       .order('date_depart', { ascending: true });
     if (!error && data) {
-      return { table, missions: data as unknown as MarketplaceMission[] };
+      return { table, missions: (data as any[]).map(r => r as MarketplaceMission) };
     }
     lastError = error;
   }

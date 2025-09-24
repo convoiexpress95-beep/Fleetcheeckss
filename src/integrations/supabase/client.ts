@@ -1,7 +1,5 @@
 // Unified Supabase client (cleaned duplicated block)
 import { createClient } from '@supabase/supabase-js';
-// Use extended Database that augments generated types with quotes until upstream gen includes them
-// Use extended Database that augments generated types with Convoiturage tables
 import type { Database } from './types.extended';
 
 // Allow overriding via environment variables for safer configuration in web builds
@@ -17,15 +15,17 @@ console.log('DEBUG: env variables:', {
 
 // Forcer l'utilisation de l'URL distante (pas de proxy pour le moment)
 const useProxy = false; // Temporairement désactivé pour debug
-const SUPABASE_URL = env.VITE_SUPABASE_URL || 'https://lucpsjwaglmiejpfxofe.supabase.co';
+const SUPABASE_URL = env.VITE_SUPABASE_URL || 'https://vdygbqinodzvkdwegvpq.supabase.co';
 // Accept both common names for the anon key (avec fallback direct)
-const SUPABASE_ANON_KEY = env.VITE_SUPABASE_ANON_KEY || env.VITE_SUPABASE_PUBLISHABLE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx1Y3BzandhZ2xtaWVqcGZ4b2ZlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTM4OTA5NzYsImV4cCI6MjA2OTQ2Njk3Nn0.e3sJec_03qxC9C4aHpv-fLQ36wz7c_76xePBv76Ydkc';
+const SUPABASE_ANON_KEY = env.VITE_SUPABASE_ANON_KEY || env.VITE_SUPABASE_PUBLISHABLE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZkeWdicWlub2R6dmtkd2VndnBxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTg0MTc5MzgsImV4cCI6MjA3Mzk5MzkzOH0.TTe5vUCj9e08yQtS-UuAqrCPU4lmjIpur1uiPsMXvXo';
 
 console.log('DEBUG: Supabase config:', { SUPABASE_URL, SUPABASE_ANON_KEY: SUPABASE_ANON_KEY ? 'present' : 'missing' });
 
 // Import the supabase client like this:
 // import { supabase } from "@/integrations/supabase/client";
 
+// NOTE: on retire le generic <Database> temporairement pour éviter les erreurs de typage
+// tant que supabase/types.generated.ts n'inclut pas encore toutes les tables/RPC récentes.
 export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_ANON_KEY, {
   auth: {
     storage: localStorage,

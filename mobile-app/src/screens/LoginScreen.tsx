@@ -15,7 +15,7 @@ export const LoginScreen: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  const { signIn } = useAuth();
+  const { signIn, signInWithGoogle } = useAuth();
 
   const handleLogin = async () => {
     if (!email || !password) return;
@@ -78,6 +78,10 @@ export const LoginScreen: React.FC = () => {
           <Text style={styles.footerText}>
             Application réservée aux convoyeurs autorisés
           </Text>
+          <View style={{ height: 16 }} />
+          <TouchableOpacity style={[styles.button, { backgroundColor: '#DB4437' }]} onPress={signInWithGoogle}>
+            <Text style={styles.buttonText}>Continuer avec Google</Text>
+          </TouchableOpacity>
         </View>
       </View>
     </KeyboardAvoidingView>

@@ -17,8 +17,9 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { Users, Settings, Crown, Shield, Database, Bell, Mail, FileText, CreditCard, Activity, BarChart3, UserPlus, Trash2, Edit3, Eye, AlertTriangle, CheckCircle, XCircle, Server, HardDrive, Wifi, Truck } from "lucide-react";
+import { Users, Settings, Crown, Shield, Database, Bell, Mail, FileText, CreditCard, Activity, BarChart3, UserPlus, Trash2, Edit3, Eye, AlertTriangle, CheckCircle, XCircle, Server, HardDrive, Wifi, Truck, Loader2, Copy, RefreshCw } from "lucide-react";
 import { VehicleModelsManager } from "@/components/VehicleModelsManager";
+import { getSignedUrlForDocument, normalizeKeyForBucket } from "@/integrations/supabase/storage";
 
 interface RealTimeStats {
   totalUsers: number;
@@ -27,6 +28,284 @@ interface RealTimeStats {
   completedMissions: number;
   totalRevenue: number;
   systemHealth: 'healthy' | 'warning' | 'error';
+}
+
+function ConvoyeurApplicationsPanel() {
+  const [apps, setApps] = useState<any[]>([]);
+  const [rawApps, setRawApps] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [urlCache, setUrlCache] = useState<Record<string, string>>({});
+  const [statusFilter, setStatusFilter] = useState<'all'|'submitted'|'approved'|'rejected'|'pending'>('all');
+  const [docLoadingKey, setDocLoadingKey] = useState<string | null>(null);
+  const { toast } = useToast();
+  const [search, setSearch] = useState("");
+  const [pageSize, setPageSize] = useState(25);
+  const [pageIndex, setPageIndex] = useState(0);
+
+  const load = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const { data, error } = await (supabase as any)
+        .from('convoyeur_applications')
+        .select('*')
+        .order('submitted_at', { ascending: false })
+        .limit(50);
+      if (error) throw error;
+      const rows = (data || []) as any[];
+      setRawApps(rows);
+      // derive filtered + paginated below
+    } catch (e: any) {
+      setError(e.message || 'Erreur chargement');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { load(); }, [statusFilter]);
+
+  useEffect(() => {
+    // derive filtered rows whenever inputs change
+    const base = rawApps;
+    const filteredByStatus = statusFilter === 'all' ? base : base.filter(r => (r.status || 'submitted') === statusFilter);
+    const q = search.trim().toLowerCase();
+    const filtered = q
+      ? filteredByStatus.filter(r =>
+          (r.user_id || '').toLowerCase().includes(q) ||
+          (r.vehicle_types || '').toLowerCase().includes(q) ||
+          (r.admin_notes || '').toLowerCase().includes(q)
+        )
+      : filteredByStatus;
+    const start = pageIndex * pageSize;
+    const page = filtered.slice(start, start + pageSize);
+    setApps(page);
+  }, [rawApps, statusFilter, search, pageIndex, pageSize]);
+
+  const buildDocKey = (uid: string, raw?: string | null) => {
+    if (!uid || !raw) return null;
+    // Les formulaires stockent souvent "documents/<userId>/file.ext" ou juste "<userId>/file.ext"
+    // On normalise pour obtenir seulement "<userId>/file.ext"
+    const k = normalizeKeyForBucket('documents', raw);
+    // Si la clé ne commence pas par uid/, l'ajouter par sécurité (pas obligatoire mais cohérent)
+    return k.startsWith(`${uid}/`) ? k : `${uid}/${k}`;
+  };
+
+  const ensureSignedUrl = async (cacheKey: string, bucketKey: string | null) => {
+    if (!bucketKey) return null;
+    if (urlCache[bucketKey]) return urlCache[bucketKey];
+    setDocLoadingKey(bucketKey);
+    const url = await getSignedUrlForDocument(bucketKey, 60 * 30); // 30 min
+    setDocLoadingKey((k) => (k === bucketKey ? null : k));
+    if (url) setUrlCache((c) => ({ ...c, [bucketKey]: url }));
+    return url;
+  };
+
+  const copyLink = async (key: string | null) => {
+    if (!key) return;
+    let url = urlCache[key];
+    if (!url) {
+      url = await ensureSignedUrl('copy:' + key, key) || '';
+    }
+    if (!url) return;
+    await navigator.clipboard.writeText(url);
+    toast({ title: 'Lien copié', description: 'URL signée copiée dans le presse-papiers.' });
+  };
+
+  const refreshLink = async (key: string | null) => {
+    if (!key) return;
+    setUrlCache((c) => { const nc = { ...c }; delete nc[key]; return nc; });
+    const url = await ensureSignedUrl('refresh:' + key, key);
+    if (url) toast({ title: 'Lien mis à jour' });
+  };
+
+  const exportCsv = () => {
+    // Exporter les lignes filtrées (sans pagination)
+    const base = rawApps;
+    const filteredByStatus = statusFilter === 'all' ? base : base.filter(r => (r.status || 'submitted') === statusFilter);
+    const q = search.trim().toLowerCase();
+    const filtered = q
+      ? filteredByStatus.filter(r =>
+          (r.user_id || '').toLowerCase().includes(q) ||
+          (r.vehicle_types || '').toLowerCase().includes(q) ||
+          (r.admin_notes || '').toLowerCase().includes(q)
+        )
+      : filteredByStatus;
+    const headers = ['id','user_id','status','submitted_at','reviewed_at','driving_experience','vehicle_types'];
+    const rows = filtered.map((r:any) => [r.id, r.user_id, r.status, r.submitted_at, r.reviewed_at, r.driving_experience, r.vehicle_types]);
+    const csv = [headers.join(','), ...rows.map(r => r.map(v => (v==null?'' : String(v).includes(',')?`"${String(v).replace(/"/g,'""')}"`:String(v))).join(','))].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = 'convoyeur_applications.csv'; a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const review = async (id: string, approve: boolean) => {
+    let notes = approve ? 'Approuvé' : 'Refusé';
+    if (!approve) {
+      const input = window.prompt('Motif du refus (facultatif):', 'Documents incomplets');
+      if (input !== null) notes = input;
+    }
+    const { error } = await (supabase as any).rpc('admin_review_convoyeur_application', {
+      _application_id: id,
+      _approve: approve,
+      _notes: notes,
+    });
+    if (error) {
+      toast({ title: 'Action échouée', description: error.message, variant: 'destructive' });
+      return;
+    }
+    toast({ title: approve ? 'Candidature approuvée' : 'Candidature refusée' });
+    await load();
+  };
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between">
+        <h3 className="text-lg font-semibold">Candidatures Convoyeur</h3>
+        <div className="flex items-center gap-2">
+          <Label className="text-sm">Statut</Label>
+          <select
+            value={statusFilter}
+            onChange={(e)=>setStatusFilter(e.target.value as any)}
+            className="border rounded px-2 py-1 text-sm bg-background"
+          >
+            <option value="all">Tous</option>
+            <option value="submitted">Soumis</option>
+            <option value="approved">Approuvés</option>
+            <option value="rejected">Refusés</option>
+            <option value="pending">En attente</option>
+          </select>
+          <Input
+            aria-label="Rechercher"
+            value={search}
+            onChange={(e)=>{ setSearch(e.target.value); setPageIndex(0);} }
+            placeholder="Rechercher (user, types, notes)"
+            className="h-8 w-60"
+          />
+          <Button variant="outline" size="sm" onClick={exportCsv} aria-label="Exporter CSV">Exporter CSV</Button>
+        </div>
+      </div>
+      {loading && (
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <Loader2 className="w-4 h-4 animate-spin" />
+          Chargement…
+        </div>
+      )}
+      {error && <div className="text-red-500">{error}</div>}
+      <div className="border rounded overflow-auto">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Utilisateur</TableHead>
+              <TableHead>Statut</TableHead>
+              <TableHead>Soumis le</TableHead>
+              <TableHead>Expérience</TableHead>
+              <TableHead>Types</TableHead>
+              <TableHead>Documents</TableHead>
+              <TableHead>Actions</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {apps.map((a) => {
+              const StatusBadge = () => (
+                <Badge variant={a.status === 'approved' ? 'default' : a.status === 'rejected' ? 'destructive' : 'outline'}>
+                  {a.status || 'submitted'}
+                </Badge>
+              );
+              const docFields: Array<{field: string; label: string}> = [
+                { field: 'kbis_document_url', label: 'KBIS' },
+                { field: 'license_document_url', label: 'Permis' },
+                { field: 'vigilance_document_url', label: 'Vigilance' },
+                { field: 'garage_document_url', label: 'W Garage' },
+              ];
+              return (
+                <TableRow key={a.id}>
+                  <TableCell className="text-xs break-all">{a.user_id}</TableCell>
+                  <TableCell><StatusBadge /></TableCell>
+                  <TableCell className="text-xs">{a.submitted_at ? new Date(a.submitted_at).toLocaleString('fr-FR') : '-'}</TableCell>
+                  <TableCell className="text-xs">{a.driving_experience ?? '-'} ans</TableCell>
+                  <TableCell className="text-xs">{a.vehicle_types ?? '-'}</TableCell>
+                  <TableCell>
+                    <div className="flex flex-wrap gap-2">
+                      {docFields.map(({field, label}) => {
+                        const key = buildDocKey(a.user_id, a[field]);
+                        const display = label;
+                        const disabled = !key;
+                        return (
+                          <div key={field} className="flex items-center gap-1">
+                            <a
+                              aria-label={`Ouvrir ${label}`}
+                              href={key && urlCache[key] ? urlCache[key] : '#'}
+                              onClick={async (e) => {
+                                if (!key) { e.preventDefault(); return; }
+                                if (!urlCache[key]) {
+                                  e.preventDefault();
+                                  const u = await ensureSignedUrl(field + ':' + a.id, key);
+                                  if (u) window.open(u, '_blank');
+                                }
+                              }}
+                              className={`px-2 py-1 rounded border text-xs inline-flex items-center gap-1 ${disabled ? 'opacity-50 cursor-not-allowed' : 'hover:bg-accent'}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              title={a[field] || 'Aucun fichier'}
+                            >
+                              {docLoadingKey === key ? <Loader2 className="w-3 h-3 animate-spin" /> : null}
+                              <span>{display}</span>
+                            </a>
+                            <button aria-label={`Copier lien ${label}`} disabled={disabled} className={`p-1 border rounded ${disabled?'opacity-50 cursor-not-allowed':'hover:bg-accent'}`} onClick={() => copyLink(key)}>
+                              <Copy className="w-3 h-3" />
+                            </button>
+                            <button aria-label={`Rafraîchir lien ${label}`} disabled={disabled} className={`p-1 border rounded ${disabled?'opacity-50 cursor-not-allowed':'hover:bg-accent'}`} onClick={() => refreshLink(key)}>
+                              <RefreshCw className={`w-3 h-3 ${docLoadingKey===key?'animate-spin':''}`} />
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex gap-2">
+                      <Button aria-label="Approuver" size="sm" className="bg-green-600 hover:bg-green-700" onClick={() => review(a.id, true)}>Approuver</Button>
+                      <Button aria-label="Refuser" size="sm" variant="destructive" onClick={() => review(a.id, false)}>Refuser</Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              );
+            })}
+            {!loading && apps.length === 0 && (
+              <TableRow>
+                <TableCell colSpan={7} className="text-center text-sm text-muted-foreground">Aucune candidature à afficher pour ce filtre.</TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
+      </div>
+      {/* Pagination */}
+      <div className="flex items-center justify-between py-2">
+        <div className="flex items-center gap-2 text-sm">
+          <span>Éléments par page</span>
+          <Select value={String(pageSize)} onValueChange={(v:any)=>{ setPageSize(parseInt(v)||25); setPageIndex(0); }}>
+            <SelectTrigger className="w-20 h-8"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="10">10</SelectItem>
+              <SelectItem value="25">25</SelectItem>
+              <SelectItem value="50">50</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={()=>setPageIndex((p)=>Math.max(0,p-1))} disabled={pageIndex===0}>Précédent</Button>
+          <span className="text-sm">Page {pageIndex+1}</span>
+          <Button variant="outline" size="sm" onClick={()=>setPageIndex((p)=>p+1)} disabled={(pageIndex+1)*pageSize >= (statusFilter==='all' ? rawApps : rawApps.filter(r=>(r.status||'submitted')===statusFilter)).filter((r:any)=>{
+            const q = search.trim().toLowerCase();
+            return q ? ((r.user_id||'').toLowerCase().includes(q) || (r.vehicle_types||'').toLowerCase().includes(q) || (r.admin_notes||'').toLowerCase().includes(q)) : true;
+          }).length}>Suivant</Button>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 export default function Admin() {
@@ -63,8 +342,7 @@ export default function Admin() {
         // Statistiques utilisateurs
         const { data: userStats, error: userError } = await supabase
           .from('profiles')
-          .select('status')
-          .eq('status', 'active');
+          .select('user_id');
         
         if (userError) throw userError;
 
@@ -83,8 +361,10 @@ export default function Admin() {
         // Charger état maintenance
         const { data: maint } = await supabase.from('maintenance_flags').select('*').maybeSingle();
         if (maint) {
-          setMaintenance(!!maint.enabled);
-          setMaintenanceBanner(maint.message || null);
+          type MaintRow = { enabled?: boolean | null; message?: string | null };
+          const m = maint as unknown as MaintRow;
+          setMaintenance(!!m.enabled);
+          setMaintenanceBanner(m.message ?? null);
         }
 
       } catch (error) {
@@ -163,7 +443,11 @@ export default function Admin() {
       return;
     }
     try {
-      const { error } = await supabase.rpc('admin_set_membership', { p_user: topupUserId, p_plan: membershipPlan, p_expires_at: null });
+      const { error } = await (supabase as any).rpc('admin_set_membership', {
+        p_user: topupUserId,
+        p_plan: membershipPlan,
+        p_expires_at: null
+      });
       if (error) throw error;
       toast({ title: 'Abonnement mis à jour', description: `Plan ${membershipPlan} assigné.` });
     } catch (e:any) {
@@ -177,7 +461,11 @@ export default function Admin() {
       return;
     }
     try {
-      const { error } = await supabase.rpc('admin_set_role', { p_user: topupUserId, p_role: roleToGrant, p_grant: grant });
+      const { error } = await (supabase as any).rpc('admin_set_role', {
+        p_user: topupUserId,
+        p_role: roleToGrant,
+        p_grant: grant
+      });
       if (error) throw error;
       toast({ title: grant ? 'Rôle attribué' : 'Rôle retiré', description: `${roleToGrant}` });
     } catch (e:any) {
@@ -191,7 +479,10 @@ export default function Admin() {
       return;
     }
     try {
-      const { error } = await supabase.rpc('admin_mark_convoyeur_confirme', { p_user: topupUserId, p_confirmed: convoyeurConfirmed });
+      const { error } = await (supabase as any).rpc('admin_mark_convoyeur_confirme', {
+        p_user: topupUserId,
+        p_confirmed: convoyeurConfirmed
+      });
       if (error) throw error;
       toast({ title: 'Statut convoyeur', description: convoyeurConfirmed ? 'Marqué confirmé + badge vérifié' : 'Marqué non confirmé' });
     } catch (e:any) {
@@ -313,7 +604,7 @@ export default function Admin() {
 
         {/* Main Admin Tabs */}
         <Tabs defaultValue="users" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-5 glass-card">
+          <TabsList className="grid w-full grid-cols-6 glass-card">
             <TabsTrigger value="users" className="flex items-center gap-2">
               <Users className="w-4 h-4" />
               Utilisateurs ({realUsers.length})
@@ -333,6 +624,10 @@ export default function Admin() {
             <TabsTrigger value="vehicles" className="flex items-center gap-2">
               <Truck className="w-4 h-4" />
               Véhicules
+            </TabsTrigger>
+            <TabsTrigger value="convoyeurs" className="flex items-center gap-2">
+              <Shield className="w-4 h-4" />
+              Convoyeurs
             </TabsTrigger>
           </TabsList>
 
@@ -365,7 +660,7 @@ export default function Admin() {
                     <TableRow>
                       <TableHead>Nom complet</TableHead>
                       <TableHead>Email</TableHead>
-                      <TableHead>Statut</TableHead>
+                      <TableHead>Rôle</TableHead>
                       <TableHead>Créé le</TableHead>
                       <TableHead>Actions</TableHead>
                     </TableRow>
@@ -378,8 +673,8 @@ export default function Admin() {
                         </TableCell>
                         <TableCell>{user.email}</TableCell>
                         <TableCell>
-                          <Badge variant={user.status === "active" ? "default" : "destructive"}>
-                            {user.status === "active" ? "Actif" : "Inactif"}
+                          <Badge variant={user.app_role === 'admin' ? 'default' : 'outline'}>
+                            {user.app_role === 'admin' ? 'Admin' : user.app_role === 'donneur_d_ordre' ? "Donneur d'ordre" : 'Convoyeur'}
                           </Badge>
                         </TableCell>
                         <TableCell>
@@ -424,6 +719,22 @@ export default function Admin() {
                     ))}
                   </TableBody>
                 </Table>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Convoyeurs - Revue des candidatures */}
+          <TabsContent value="convoyeurs" className="space-y-6">
+            <Card className="glass-card">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Shield className="w-5 h-5" />
+                  Revue des candidatures convoyeur
+                </CardTitle>
+                <CardDescription>Validez ou refusez les candidatures. Les documents proviennent du bucket privé 'documents'.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ConvoyeurApplicationsPanel />
               </CardContent>
             </Card>
           </TabsContent>

@@ -17,6 +17,7 @@ import Tracking from "./pages/Tracking";
 import PublicTracking from "./pages/PublicTracking";
 import Reports from "./pages/Reports";
 import Billing from "./pages/Billing";
+import AuthCallback from "./pages/AuthCallback";
 import Shop from "./pages/Shop";
 import Marketplace from "./pages/Marketplace";
 import MissionDetailMarketplace from "./pages/MissionDetailMarketplace";
@@ -58,6 +59,7 @@ const App = () => (
             <Route path="/" element={<Landing />} />
             <Route path="/login" element={<Login />} />
             <Route path="/auth/login" element={<Login />} />
+            <Route path="/auth/callback" element={<AuthCallback />} />
             <Route path="/public-tracking/:token" element={<PublicTracking />} />
             <Route path="/dashboard" element={
               <ProtectedRoute>

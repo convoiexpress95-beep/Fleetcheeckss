@@ -47,15 +47,12 @@ export default function PublicTracking() {
       }
 
       try {
-        // Appel en GET avec token en query pour coller à l’implémentation de la fonction Edge
-        const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/public-tracking?token=${encodeURIComponent(token)}`;
-        const res = await fetch(url, { method: 'GET' });
-        if (!res.ok) {
-          const payload = await res.json().catch(() => ({}));
-          throw new Error(payload?.error || `HTTP ${res.status}`);
-        }
-        const payload = await res.json();
-        setTrackingData(payload);
+        // Utiliser l'API intégrée pour éviter toute dépendance à VITE_SUPABASE_URL
+        const { data, error } = await supabase.functions.invoke('public-tracking', {
+          body: { token }
+        });
+        if (error) throw error;
+        setTrackingData(data);
       } catch (err) {
         console.error('Error loading tracking data:', err);
         setError('Lien de suivi invalide ou expiré');
@@ -68,7 +65,51 @@ export default function PublicTracking() {
 
     // Refresh every 30 seconds
     const interval = setInterval(loadTrackingData, 30000);
-    return () => clearInterval(interval);
+
+    // Realtime minimal: écouter la dernière position pour la mission en direct
+    // Sans complexité: on se réabonne après récupération initiale lorsque mission connue
+    let channel: ReturnType<typeof supabase.channel> | null = null;
+    if (token) {
+      // On ne connaît l'ID mission qu'après le premier fetch; donc on met un petit délai
+      setTimeout(() => {
+        const missionId = (trackingData?.mission?.id) || undefined;
+        if (!missionId) return;
+        channel = supabase
+          .channel(`public-tracking-${missionId}`)
+          .on(
+            'postgres_changes',
+            { event: 'INSERT', schema: 'public', table: 'mission_tracking', filter: `mission_id=eq.${missionId}` },
+            (payload) => {
+              try {
+                const row: any = payload.new || {};
+                setTrackingData((prev) => {
+                  if (!prev) return prev;
+                  return {
+                    ...prev,
+                    tracking: {
+                      latitude: Number(row.latitude),
+                      longitude: Number(row.longitude),
+                      speed: row.speed != null ? Number(row.speed) : prev.tracking?.speed,
+                      heading: row.heading != null ? Number(row.heading) : prev.tracking?.heading,
+                      last_update: row.created_at || new Date().toISOString(),
+                    }
+                  } as any;
+                });
+              } catch (e) {
+                console.warn('Realtime tracking update error', e);
+              }
+            }
+          )
+          .subscribe((status) => {
+            // Optionnel: console.log('Realtime status', status)
+          });
+      }, 250);
+    }
+
+    return () => {
+      clearInterval(interval);
+      if (channel) supabase.removeChannel(channel);
+    };
   }, [token]);
 
   const getStatusColor = (status: string) => {
@@ -122,6 +163,14 @@ export default function PublicTracking() {
     );
   }
 
+  // Normaliser les données (timestamps et types numériques)
+  const lastUpdate = trackingData.tracking?.last_update 
+    || (trackingData as any).lastUpdate 
+    || (trackingData.tracking as any)?.created_at 
+    || undefined;
+  const lat = trackingData.tracking?.latitude != null ? Number(trackingData.tracking.latitude) : undefined;
+  const lng = trackingData.tracking?.longitude != null ? Number(trackingData.tracking.longitude) : undefined;
+
   const missions: MissionWithTracking[] = [{
     ...trackingData.mission,
     status: trackingData.mission.status as 'pending' | 'in_progress' | 'completed' | 'cancelled',
@@ -129,15 +178,15 @@ export default function PublicTracking() {
     delivery_date: undefined,
     created_by: '', // Not needed for public view
     driver_id: undefined,
-    tracking: trackingData.tracking ? {
+    tracking: (lat != null && lng != null) ? {
       mission_id: trackingData.mission.id,
       driver_id: undefined,
-      latitude: trackingData.tracking.latitude,
-      longitude: trackingData.tracking.longitude,
-      last_update: trackingData.tracking.last_update,
+      latitude: lat,
+      longitude: lng,
+      last_update: lastUpdate as string | undefined,
       status: trackingData.mission.status,
-      speed: trackingData.tracking.speed,
-      heading: trackingData.tracking.heading
+      speed: trackingData.tracking?.speed != null ? Number(trackingData.tracking.speed) : undefined,
+      heading: trackingData.tracking?.heading != null ? Number(trackingData.tracking.heading) : undefined,
     } : undefined,
     driver_profile: null
   }];
